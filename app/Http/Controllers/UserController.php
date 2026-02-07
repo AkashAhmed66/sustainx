@@ -13,10 +13,57 @@ class UserController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::with('roles')->paginate(10);
-        return view('users.index', compact('users'));
+        $query = User::with('roles');
+        
+        // Search
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhereHas('roles', function($q) use ($search) {
+                      $q->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+        
+        // Sorting
+        $sortField = $request->get('sort', 'created_at');
+        $sortDirection = $request->get('direction', 'desc');
+        
+        // Map 'user' to 'name' for database column
+        $dbSortField = $sortField === 'user' ? 'name' : $sortField;
+        $query->orderBy($dbSortField, $sortDirection);
+        
+        // Pagination
+        $perPage = $request->get('per_page', 10);
+        $items = $query->paginate($perPage);
+        
+        $columns = [
+            'user' => 'User',
+            'email' => 'Email',
+            'roles' => 'Roles',
+            'created_at' => 'Joined',
+            'actions' => 'Actions',
+        ];
+        
+        $bulkEnabled = false;
+        
+        // Table configuration
+        $config = [
+            'pageHeader' => 'Users Management',
+            'tableTitle' => 'All Users',
+            'createRoute' => route('users.create'),
+            'createText' => 'Add User',
+            'editRoute' => 'users.edit',
+            'destroyRoute' => 'users.destroy',
+            'bulkDeleteRoute' => route('users.bulk-delete'),
+            'searchPlaceholder' => 'Search users by name, email or role...',
+        ];
+        
+        return view('users.index', compact('items', 'columns', 'bulkEnabled', 'config'));
     }
 
     /**
@@ -108,5 +155,29 @@ class UserController extends Controller
 
         return redirect()->route('users.index')
             ->with('success', 'User deleted successfully.');
+    }
+    
+    /**
+     * Bulk delete users.
+     */
+    public function bulkDelete(Request $request)
+    {
+        $ids = json_decode($request->ids, true);
+        
+        if (empty($ids)) {
+            return redirect()->route('users.index')
+                ->with('error', 'No users selected.');
+        }
+        
+        // Prevent deletion of current user
+        if (in_array(Auth::id(), $ids)) {
+            return redirect()->route('users.index')
+                ->with('error', 'Cannot delete yourself.');
+        }
+        
+        User::whereIn('id', $ids)->delete();
+        
+        return redirect()->route('users.index')
+            ->with('success', count($ids) . ' user(s) deleted successfully.');
     }
 }

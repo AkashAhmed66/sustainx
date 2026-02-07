@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Alpine.js x-cloak directive */
+[x-cloak] {
+    display: none !important;
+}
+
 /* ========================================
    CENTRAL THEME CONFIGURATION
    ======================================== */
@@ -212,6 +217,21 @@
     background: linear-gradient(135deg, #1e4f3b 0%, #2a7d59 50%, #1a4232 100%);
     position: relative;
     overflow: hidden;
+}
+
+/* Fixed Left Panel */
+.fixed-left-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    overflow-y: auto;
+}
+
+@media (max-width: 1023px) {
+    .fixed-left-panel {
+        display: none;
+    }
 }
 
 .auth-background::before {

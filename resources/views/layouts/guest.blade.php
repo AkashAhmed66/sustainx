@@ -15,11 +15,11 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased">
-        <div class="min-h-screen flex">
-            <!-- Left Side - Sustainability Background -->
-            <div class="hidden lg:flex lg:w-1/2 xl:w-3/5 auth-background relative">
-                <!-- Overlay -->
-                <div class="absolute inset-0 bg-gradient-to-br from-primary-900/90 via-primary-800/85 to-primary-900/90"></div>
+        <div class="flex h-screen overflow-hidden">
+            <!-- Left Side - Login Image Background (Fixed) -->
+            <div class="hidden lg:flex lg:w-1/2 xl:w-3/5 relative fixed-left-panel" style="background-image: url('{{ asset('images/login.jpg') }}'); background-size: cover; background-position: center;">
+                <!-- Light Greenish Overlay -->
+                <div class="absolute inset-0 bg-primary-500/80"></div>
                 
                 <!-- Content -->
                 <div class="relative z-10 flex flex-col justify-between p-12 text-white w-full">
@@ -96,10 +96,12 @@
                 </div>
             </div>
 
-            <!-- Right Side - Auth Form -->
-            <div class="w-full lg:w-1/2 xl:w-2/5 flex items-center justify-center p-6 sm:p-12 bg-neutral-50">
-                <div class="w-full max-w-md">
-                    {{ $slot }}
+            <!-- Right Side - Auth Form (Scrollable) -->
+            <div class="w-full lg:w-1/2 xl:w-2/5 lg:ml-[50%] xl:ml-[60%] overflow-y-auto bg-neutral-50">
+                <div class="flex items-center justify-center min-h-full p-6 sm:p-12">
+                    <div class="w-full max-w-md">
+                        {{ $slot }}
+                    </div>
                 </div>
             </div>
         </div>

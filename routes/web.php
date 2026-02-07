@@ -33,6 +33,7 @@ Route::middleware('auth')->group(function () {
     });
     Route::middleware('permission:delete users')->group(function () {
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+        Route::delete('/users', [UserController::class, 'bulkDelete'])->name('users.bulk-delete');
     });
     
     // Role Management Routes
@@ -49,6 +50,7 @@ Route::middleware('auth')->group(function () {
     });
     Route::middleware('permission:delete roles')->group(function () {
         Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
+        Route::delete('/roles', [RoleController::class, 'bulkDelete'])->name('roles.bulk-delete');
     });
     
     // Permission Management Routes
@@ -65,6 +67,7 @@ Route::middleware('auth')->group(function () {
     });
     Route::middleware('permission:delete permissions')->group(function () {
         Route::delete('/permissions/{permission}', [PermissionController::class, 'destroy'])->name('permissions.destroy');
+        Route::delete('/permissions', [PermissionController::class, 'bulkDelete'])->name('permissions.bulk-delete');
     });
 });
 

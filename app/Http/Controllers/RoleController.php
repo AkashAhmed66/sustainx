@@ -11,10 +11,52 @@ class RoleController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $roles = Role::with('permissions')->paginate(10);
-        return view('roles.index', compact('roles'));
+        $query = Role::with('permissions');
+        
+        // Search
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhereHas('permissions', function($q) use ($search) {
+                      $q->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+        
+        // Sorting
+        $sortField = $request->get('sort', 'created_at');
+        $sortDirection = $request->get('direction', 'desc');
+        $query->orderBy($sortField, $sortDirection);
+        
+        // Pagination
+        $perPage = $request->get('per_page', 10);
+        $items = $query->paginate($perPage);
+        
+        $columns = [
+            'name' => 'Role Name',
+            'permissions' => 'Permissions',
+            'created_at' => 'Created At',
+            'actions' => 'Actions',
+        ];
+        
+        $bulkEnabled = true;
+        
+        // Table configuration
+        $config = [
+            'pageHeader' => 'Roles Management',
+            'tableTitle' => 'All Roles',
+            'createRoute' => route('roles.create'),
+            'createText' => 'Create Role',
+            'editRoute' => 'roles.edit',
+            'destroyRoute' => 'roles.destroy',
+            'bulkDeleteRoute' => route('roles.bulk-delete'),
+            'searchPlaceholder' => 'Search roles...',
+        ];
+        
+        return view('roles.index', compact('items', 'columns', 'bulkEnabled', 'config'));
     }
 
     /**
@@ -39,7 +81,7 @@ class RoleController extends Controller
         $role = Role::create(['name' => $validated['name']]);
         
         if (isset($validated['permissions'])) {
-            $role->syncPermissions($validated['permissions']);
+            $role->syncPermissions(array_map('intval', $validated['permissions']));
         }
 
         return redirect()->route('roles.index')
@@ -68,7 +110,7 @@ class RoleController extends Controller
         ]);
 
         $role->update(['name' => $validated['name']]);
-        $role->syncPermissions($request->permissions ?? []);
+        $role->syncPermissions(array_map('intval', $request->permissions ?? []));
 
         return redirect()->route('roles.index')
             ->with('success', 'Role updated successfully.');
@@ -88,5 +130,30 @@ class RoleController extends Controller
 
         return redirect()->route('roles.index')
             ->with('success', 'Role deleted successfully.');
+    }
+    
+    /**
+     * Bulk delete roles.
+     */
+    public function bulkDelete(Request $request)
+    {
+        $ids = json_decode($request->ids, true);
+        
+        if (empty($ids)) {
+            return redirect()->route('roles.index')
+                ->with('error', 'No roles selected.');
+        }
+        
+        // Prevent deletion of admin role
+        $adminRole = Role::where('name', 'admin')->first();
+        if ($adminRole && in_array($adminRole->id, $ids)) {
+            return redirect()->route('roles.index')
+                ->with('error', 'Cannot delete admin role.');
+        }
+        
+        Role::whereIn('id', $ids)->delete();
+        
+        return redirect()->route('roles.index')
+            ->with('success', count($ids) . ' role(s) deleted successfully.');
     }
 }

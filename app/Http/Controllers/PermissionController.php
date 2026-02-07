@@ -10,10 +10,50 @@ class PermissionController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $permissions = Permission::paginate(10);
-        return view('permissions.index', compact('permissions'));
+        $query = Permission::query();
+        
+        // Search
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('guard_name', 'like', "%{$search}%");
+            });
+        }
+        
+        // Sorting
+        $sortField = $request->get('sort', 'created_at');
+        $sortDirection = $request->get('direction', 'desc');
+        $query->orderBy($sortField, $sortDirection);
+        
+        // Pagination
+        $perPage = $request->get('per_page', 10);
+        $items = $query->paginate($perPage);
+        
+        $columns = [
+            'name' => 'Permission Name',
+            'guard_name' => 'Guard Name',
+            'created_at' => 'Created At',
+            'actions' => 'Actions',
+        ];
+        
+        $bulkEnabled = true;
+        
+        // Table configuration
+        $config = [
+            'pageHeader' => 'Permissions Management',
+            'tableTitle' => 'All Permissions',
+            'createRoute' => route('permissions.create'),
+            'createText' => 'Create Permission',
+            'editRoute' => 'permissions.edit',
+            'destroyRoute' => 'permissions.destroy',
+            'bulkDeleteRoute' => route('permissions.bulk-delete'),
+            'searchPlaceholder' => 'Search permissions...',
+        ];
+        
+        return view('permissions.index', compact('items', 'columns', 'bulkEnabled', 'config'));
     }
 
     /**
@@ -71,5 +111,23 @@ class PermissionController extends Controller
 
         return redirect()->route('permissions.index')
             ->with('success', 'Permission deleted successfully.');
+    }
+    
+    /**
+     * Bulk delete permissions.
+     */
+    public function bulkDelete(Request $request)
+    {
+        $ids = json_decode($request->ids, true);
+        
+        if (empty($ids)) {
+            return redirect()->route('permissions.index')
+                ->with('error', 'No permissions selected.');
+        }
+        
+        Permission::whereIn('id', $ids)->delete();
+        
+        return redirect()->route('permissions.index')
+            ->with('success', count($ids) . ' permission(s) deleted successfully.');
     }
 }
