@@ -1,0 +1,343 @@
+Perfect — that clarification helps a lot 👍
+What you’re describing is **much closer to how many real ESG / scoring tools actually work**: simple, predictable, auditable calculations instead of a full math-expression engine.
+
+Below is a **clean, professional, industry-level database design**, adjusted **exactly** to your rules:
+
+* ❌ No soft deletes
+* ✅ One equation **per question**
+* ✅ Equation = ordered list of factors
+* ✅ User provides a numeric answer
+* ✅ Factors are applied **step-by-step using serial numbers**
+* ✅ Simple to implement, easy to audit, easy to explain to clients
+
+This is **100% production-ready**.
+
+---
+
+# 🧠 CALCULATION LOGIC (VERY CLEAR)
+
+For a numeric question:
+
+```
+user_answer = 100
+
+Factor 1 (sn=1): multiply by 0.5  → 50
+Factor 2 (sn=2): add 10           → 60
+Factor 3 (sn=3): divide by 2      → 30
+
+Final result = 30
+```
+
+No expressions.
+No variable parsing.
+No ambiguity.
+
+---
+
+# 🧱 COMPLETE DATABASE SCHEMA (FINAL)
+
+---
+
+## 1️⃣ sections
+
+```sql
+id (PK)
+name
+description
+order_no
+is_active
+created_at
+updated_at
+```
+
+---
+
+## 2️⃣ subsections
+
+```sql
+id (PK)
+section_id (FK → sections.id)
+name
+description
+order_no
+is_active
+created_at
+updated_at
+```
+
+**Relation**
+
+* Section → many Subsections
+
+---
+
+## 3️⃣ items
+
+```sql
+id (PK)
+subsection_id (FK → subsections.id)
+name
+description
+order_no
+is_active
+created_at
+updated_at
+```
+
+**Relation**
+
+* Subsection → many Items
+
+---
+
+## 4️⃣ question_types
+
+```sql
+id (PK)
+name        -- numeric, text, boolean, mcq
+created_at
+updated_at
+```
+
+---
+
+## 5️⃣ questions
+
+```sql
+id (PK)
+item_id (FK → items.id)
+question_text
+question_type_id (FK → question_types.id)
+unit
+is_required
+is_active
+created_at
+updated_at
+```
+
+✔ One question belongs to one item
+✔ Only numeric questions will have equations
+
+---
+
+## 6️⃣ options (MCQ only)
+
+```sql
+id (PK)
+question_id (FK → questions.id)
+option_text
+option_value     -- optional numeric score
+order_no
+created_at
+updated_at
+```
+
+---
+
+# 🌍 LOCATION & FACTORIES
+
+---
+
+## 7️⃣ countries
+
+```sql
+id (PK)
+name
+iso_code
+created_at
+updated_at
+```
+
+---
+
+## 8️⃣ factory_types
+
+```sql
+id (PK)
+name
+created_at
+updated_at
+```
+
+---
+
+## 9️⃣ factories
+
+```sql
+id (PK)
+name
+factory_type_id (FK → factory_types.id)
+country_id (FK → countries.id)
+address
+is_active
+created_at
+updated_at
+```
+
+---
+
+## 🔟 factory_user (many-to-many)
+
+```sql
+id (PK)
+factory_id (FK → factories.id)
+user_id (FK → users.id)
+role        -- admin, auditor, manager
+created_at
+updated_at
+```
+
+---
+
+# 📋 ASSESSMENTS (VERY IMPORTANT)
+
+---
+
+## 1️⃣1️⃣ assessments
+
+```sql
+id (PK)
+factory_id (FK → factories.id)
+year
+period        -- annual, quarterly
+status        -- draft, submitted, approved
+submitted_at
+created_at
+updated_at
+```
+
+✔ One factory
+✔ Multiple ESG submissions
+✔ Supports year-wise comparison
+
+---
+
+# ✍️ ANSWERS (USER INPUT)
+
+---
+
+## 1️⃣2️⃣ answers
+
+```sql
+id (PK)
+assessment_id (FK → assessments.id)
+question_id (FK → questions.id)
+item_id (FK → items.id)
+
+numeric_value   DECIMAL(15,4) NULL
+text_value      TEXT NULL
+option_id       (FK → options.id) NULL
+
+created_at
+updated_at
+```
+
+✔ Question → many answers
+✔ Assessment → many answers
+✔ Clean separation of answer types
+
+---
+
+# 🧮 SIMPLE & PROFESSIONAL EQUATION ENGINE
+
+---
+
+## 1️⃣3️⃣ equations
+
+```sql
+id (PK)
+question_id (FK → questions.id)
+name
+created_at
+updated_at
+```
+
+⚠️ **Important rule**
+
+* Only **ONE equation per question**
+* Only numeric questions have equations
+
+---
+
+## 1️⃣4️⃣ factors
+
+```sql
+id (PK)
+equation_id (FK → equations.id)
+sn               -- serial number (1, 2, 3…)
+operation        -- multiply, add, subtract, divide
+factor_value     -- numeric value
+country_id (FK → countries.id) NULL
+created_at
+updated_at
+```
+
+✔ Factors are applied **in order of `sn`**
+✔ Country-specific factors supported
+✔ No reuse complexity (simple & safe)
+
+---
+
+# 📊 STORED RESULTS (FAST DASHBOARDS)
+
+---
+
+## 1️⃣5️⃣ calculation_results
+
+```sql
+id (PK)
+assessment_id (FK → assessments.id)
+question_id (FK → questions.id)
+item_id (FK → items.id)
+final_value
+created_at
+updated_at
+```
+
+✔ Result stored once
+✔ Charts load instantly
+✔ No recalculation on every page load
+
+---
+
+# 🔁 CALCULATION FLOW (IMPLEMENTATION-FRIENDLY)
+
+1. Fetch numeric answer
+2. Fetch equation for question
+3. Fetch factors ordered by `sn`
+4. Loop:
+
+   * apply operation on current value
+5. Store final value in `calculation_results`
+
+This can be written in **10–15 lines of Laravel code**.
+
+---
+
+# ✅ WHY THIS DESIGN IS PROFESSIONAL
+
+| Feature                     | Status |
+| --------------------------- | ------ |
+| Simple calculation logic    | ✅      |
+| Easy to audit               | ✅      |
+| ESG-friendly                | ✅      |
+| Country-based adjustment    | ✅      |
+| Scales well                 | ✅      |
+| Easy Laravel implementation | ✅      |
+| Client-explainable          | ✅      |
+
+This is **exactly** the level of complexity most real ESG platforms stop at.
+
+---
+
+## 🚀 NEXT (OPTIONAL)
+
+If you want, I can now:
+
+* Write **Laravel migrations**
+* Write **Laravel calculation service**
+* Design **chart queries**
+* Validate **edge cases**
+* Create **API schema (Swagger)**
+
+Just tell me what you want next 👌
