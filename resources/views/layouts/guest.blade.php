@@ -20,7 +20,7 @@
             <div class="hidden lg:flex lg:w-1/2 xl:w-3/5 relative fixed-left-panel" style="background-image: url('{{ asset('images/login.jpg') }}'); background-size: cover; background-position: center;">
                 <!-- Light Greenish Overlay -->
                 <div class="absolute inset-0 bg-primary-500/80"></div>
-                
+
                 <!-- Content -->
                 <div class="relative z-10 flex flex-col justify-between p-12 text-white w-full">
                     <!-- Logo & Brand -->
@@ -41,7 +41,7 @@
                                 Building a Sustainable Tomorrow
                             </h2>
                             <p class="text-lg text-white/90 leading-relaxed">
-                                Join us in creating innovative solutions for environmental sustainability, 
+                                Join us in creating innovative solutions for environmental sustainability,
                                 renewable energy, and a greener future for generations to come.
                             </p>
                         </div>
@@ -98,7 +98,7 @@
 
             <!-- Right Side - Auth Form (Scrollable) -->
             <div class="w-full lg:w-1/2 xl:w-2/5 lg:ml-[50%] xl:ml-[60%] overflow-y-auto bg-neutral-50">
-                <div class="flex items-center justify-center min-h-full p-6 sm:p-12">
+                <div class="flex items-center justify-center min-h-full p-4 sm:p-6 lg:p-12">
                     <div class="w-full max-w-md">
                         {{ $slot }}
                     </div>

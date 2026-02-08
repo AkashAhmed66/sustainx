@@ -1,6 +1,6 @@
 @props(['title' => null, 'createRoute' => null, 'createText' => 'Create New', 'paginator' => null, 'columns' => [], 'bulkDeleteRoute' => null, 'searchPlaceholder' => 'Search...', 'bulkEnabled' => false])
 
-<div class="dashboard-card overflow-hidden" 
+<div class="dashboard-card overflow-hidden"
      x-data="{
          selectedItems: [],
          selectAll: false,
@@ -20,25 +20,25 @@
                  let form = document.createElement('form');
                  form.method = 'POST';
                  form.action = '{{ $bulkDeleteRoute }}';
-                 
+
                  let csrfInput = document.createElement('input');
                  csrfInput.type = 'hidden';
                  csrfInput.name = '_token';
                  csrfInput.value = '{{ csrf_token() }}';
                  form.appendChild(csrfInput);
-                 
+
                  let methodInput = document.createElement('input');
                  methodInput.type = 'hidden';
                  methodInput.name = '_method';
                  methodInput.value = 'DELETE';
                  form.appendChild(methodInput);
-                 
+
                  let idsInput = document.createElement('input');
                  idsInput.type = 'hidden';
                  idsInput.name = 'ids';
                  idsInput.value = JSON.stringify(this.selectedItems);
                  form.appendChild(idsInput);
-                 
+
                  document.body.appendChild(form);
                  form.submit();
              }
@@ -46,15 +46,15 @@
      }">
     <!-- Table Header -->
     @if(isset($title) || isset($createRoute))
-    <div class="px-6 pt-6 pb-4 border-b border-neutral-200">
-        <div class="flex items-center justify-between mb-4">
+    <div class="px-4 sm:px-6 pt-4 sm:pt-6 pb-4 border-b border-neutral-200">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
             @if(isset($title))
             <h3 class="card-title mb-0">{{ $title }}</h3>
             @endif
-            
-            <div class="flex items-center gap-3">
+
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
                 @if($bulkEnabled && $bulkDeleteRoute)
-                <button @click="bulkDelete()" 
+                <button @click="bulkDelete()"
                         x-show="selectedItems.length > 0"
                         x-cloak
                         class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
@@ -64,7 +64,7 @@
                     Delete <span x-text="selectedItems.length"></span>
                 </button>
                 @endif
-                
+
                 @if(isset($createRoute))
                 <a href="{{ $createRoute }}" class="btn-primary">
                     <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -75,30 +75,30 @@
                 @endif
             </div>
         </div>
-        
+
         <!-- Search and Filters -->
-        <form method="GET" class="flex items-center justify-between gap-3">
-            <div class="relative" style="width: 320px;">
-                <input type="text" 
-                       name="search" 
-                       value="{{ request('search') }}" 
-                       placeholder="{{ $searchPlaceholder }}" 
+        <form method="GET" class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div class="relative w-full sm:w-80">
+                <input type="text"
+                       name="search"
+                       value="{{ request('search') }}"
+                       placeholder="{{ $searchPlaceholder }}"
                        class="w-full pl-10 pr-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm">
                 <svg class="w-5 h-5 text-neutral-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
             </div>
-            
-            <div class="flex items-center gap-3">
+
+            <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                 @if(request('search') || request('per_page'))
-                <a href="{{ url()->current() }}" 
+                <a href="{{ url()->current() }}"
                    class="px-4 py-2 text-neutral-600 hover:text-neutral-900 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors text-sm font-medium">
                     Clear
                 </a>
                 @endif
-                
-                <select name="per_page" 
-                        onchange="this.form.submit()" 
+
+                <select name="per_page"
+                        onchange="this.form.submit()"
                         class="px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm">
                     <option value="10" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10 per page</option>
                     <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25 per page</option>
@@ -112,7 +112,7 @@
 
     <!-- Alert Messages -->
     @if(session('success'))
-    <div class="mx-6 mt-6 mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+    <div class="mx-4 sm:mx-6 mt-4 sm:mt-6 mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
         <div class="flex items-center">
             <div class="flex-shrink-0">
                 <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,7 +127,7 @@
     @endif
 
     @if(session('error'))
-    <div class="mx-6 mt-6 mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+    <div class="mx-4 sm:mx-6 mt-4 sm:mt-6 mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
         <div class="flex items-center">
             <div class="flex-shrink-0">
                 <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -142,27 +142,29 @@
     @endif
 
     <!-- Table -->
-    <div class="overflow-x-auto">
-        <table class="w-full">
+    <div class="overflow-x-auto -mx-4 sm:mx-0">
+        <div class="inline-block min-w-full align-middle">
+            <table class="min-w-full divide-y divide-neutral-200">
+            <table class="min-w-full divide-y divide-neutral-200">
             <thead class="bg-neutral-50 border-b border-neutral-200">
                 <tr>
                     @if($bulkEnabled && $bulkDeleteRoute)
-                    <th class="px-6 py-3 text-left w-12">
-                        <input type="checkbox" 
-                               x-model="selectAll" 
+                    <th class="px-4 sm:px-6 py-3 text-left w-12">
+                        <input type="checkbox"
+                               x-model="selectAll"
                                @change="toggleAll()"
                                class="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500">
                     </th>
                     @endif
-                    
+
                     @if(!empty($columns))
                         @foreach($columns as $key => $label)
-                            <th class="px-6 py-3 text-{{ $key === 'actions' ? 'right' : 'left' }} text-xs font-semibold text-neutral-700 uppercase tracking-wider">
+                            <th class="px-4 sm:px-6 py-3 text-{{ $key === 'actions' ? 'right' : 'left' }} text-xs font-semibold text-neutral-700 uppercase tracking-wider whitespace-nowrap">
                                 @if($key !== 'actions')
-                                <a href="{{ request()->fullUrlWithQuery(['sort' => $key, 'direction' => request('sort') === $key && request('direction') === 'asc' ? 'desc' : 'asc']) }}" 
+                                <a href="{{ request()->fullUrlWithQuery(['sort' => $key, 'direction' => request('sort') === $key && request('direction') === 'asc' ? 'desc' : 'asc']) }}"
                                    class="inline-flex items-center gap-1 hover:text-neutral-900 group">
                                     {{ $label }}
-                                    <svg class="w-4 h-4 {{ request('sort') === $key ? 'text-primary-600' : 'text-neutral-400 opacity-0 group-hover:opacity-100' }}" 
+                                    <svg class="w-4 h-4 {{ request('sort') === $key ? 'text-primary-600' : 'text-neutral-400 opacity-0 group-hover:opacity-100' }}"
                                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         @if(request('sort') === $key && request('direction') === 'desc')
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -185,19 +187,20 @@
                 {{ $slot }}
             </tbody>
         </table>
+        </div>
     </div>
 
     <!-- Pagination -->
     @if(isset($paginator) && $paginator->hasPages())
-    <div class="p-6 border-t border-neutral-200">
+    <div class="p-4 sm:p-6 border-t border-neutral-200">
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
             <!-- Results Info -->
             <div class="text-sm text-neutral-600">
-                Showing 
+                Showing
                 <span class="font-medium text-neutral-900">{{ $paginator->firstItem() }}</span>
-                to 
+                to
                 <span class="font-medium text-neutral-900">{{ $paginator->lastItem() }}</span>
-                of 
+                of
                 <span class="font-medium text-neutral-900">{{ $paginator->total() }}</span>
                 results
             </div>
