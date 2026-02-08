@@ -46,4 +46,14 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    /**
+     * The factories that belong to the user.
+     */
+    public function factories()
+    {
+        return $this->belongsToMany(Factory::class)
+            ->withPivot('role')
+            ->withTimestamps();
+    }
 }

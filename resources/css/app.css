@@ -16,28 +16,28 @@
     --color-primary-light: #56b689;
     --color-primary-dark: #2a7d59;
     --color-primary-hover: #2a7d59;
-    
+
     /* Background Colors */
     --color-bg-main: #f8f9fa;
     --color-bg-sidebar: #1e4f3b;
     --color-bg-card: #ffffff;
     --color-bg-hover: #f1f3f5;
-    
+
     /* Text Colors */
     --color-text-primary: #212529;
     --color-text-secondary: #6c757d;
     --color-text-light: #ffffff;
     --color-text-muted: #adb5bd;
-    
+
     /* Border Colors */
     --color-border: #e9ecef;
     --color-border-dark: #dee2e6;
-    
+
     /* Sidebar Dimensions */
     --sidebar-width: 280px;
     --sidebar-collapsed-width: 80px;
     --topbar-height: 64px;
-    
+
     /* Transitions */
     --transition-speed: 300ms;
     --transition-timing: cubic-bezier(0.4, 0, 0.2, 1);
@@ -53,51 +53,78 @@
         width: var(--sidebar-width);
         background-color: var(--color-bg-sidebar);
     }
-    
+
     .sidebar.collapsed {
         width: var(--sidebar-collapsed-width);
     }
-    
+
+    /* Mobile Sidebar */
+    @media (max-width: 1024px) {
+        .sidebar {
+            @apply -translate-x-full;
+        }
+
+        .sidebar.mobile-open {
+            @apply translate-x-0;
+        }
+
+        .sidebar.collapsed {
+            width: var(--sidebar-width);
+            @apply -translate-x-full;
+        }
+    }
+
     .sidebar-header {
         @apply flex items-center justify-between px-6 border-b border-primary-700;
         height: var(--topbar-height);
     }
-    
+
     .sidebar-nav {
         @apply flex flex-col gap-1 px-3 py-4;
     }
-    
+
     .sidebar-link {
         @apply flex items-center gap-3 px-4 py-3 text-white/80 rounded-lg transition-all duration-200;
         @apply hover:bg-primary-700 hover:text-white;
     }
-    
+
     .sidebar-link.active {
         @apply bg-primary-600 text-white shadow-sm;
     }
-    
+
     .sidebar-link-icon {
         @apply flex-shrink-0 w-5 h-5;
     }
-    
+
     .sidebar-link-text {
         @apply font-medium text-sm whitespace-nowrap;
     }
-    
+
     .sidebar.collapsed .sidebar-link-text {
         @apply hidden;
     }
-    
+
     /* Main Content Area */
     .main-wrapper {
         @apply transition-all duration-300;
         margin-left: var(--sidebar-width);
     }
-    
+
     .main-wrapper.expanded {
         margin-left: var(--sidebar-collapsed-width);
     }
-    
+
+    /* Mobile Main Wrapper */
+    @media (max-width: 1024px) {
+        .main-wrapper {
+            margin-left: 0;
+        }
+
+        .main-wrapper.expanded {
+            margin-left: 0;
+        }
+    }
+
     /* Topbar */
     .topbar {
         @apply fixed right-0 top-0 z-30 bg-white border-b shadow-sm;
@@ -106,67 +133,79 @@
         transition: left var(--transition-speed) var(--transition-timing);
         border-color: var(--color-border);
     }
-    
+
     .topbar.expanded {
         left: var(--sidebar-collapsed-width);
     }
-    
+
+    /* Mobile Topbar */
+    @media (max-width: 1024px) {
+        .topbar {
+            left: 0;
+            right: 0;
+        }
+
+        .topbar.expanded {
+            left: 0;
+        }
+    }
+
     /* Content Area */
     .content-wrapper {
         @apply min-h-screen;
         padding-top: var(--topbar-height);
         background-color: var(--color-bg-main);
     }
-    
+
     /* Card Styles */
     .dashboard-card {
         @apply bg-white rounded-lg shadow-sm border p-6;
         border-color: var(--color-border);
     }
-    
+
     .card-title {
         @apply text-lg font-semibold mb-4;
         color: var(--color-text-primary);
     }
-    
+
     /* Buttons */
     .btn-primary {
         @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
         background-color: var(--color-primary);
         color: var(--color-text-light);
     }
-    
+
     .btn-primary:hover {
         background-color: var(--color-primary-hover);
         @apply shadow-md;
     }
-    
+
     .btn-secondary {
         @apply px-4 py-2 rounded-lg font-medium border transition-all duration-200;
         border-color: var(--color-border-dark);
         color: var(--color-text-primary);
     }
-    
+
     .btn-secondary:hover {
         background-color: var(--color-bg-hover);
     }
-    
+
     /* Toggle Button */
     .sidebar-toggle {
         @apply flex items-center justify-center w-10 h-10 rounded-lg transition-colors;
         @apply hover:bg-primary-700 text-white/80 hover:text-white;
     }
-    
+
     /* Stats Card */
     .stat-card {
         @apply dashboard-card;
     }
-    
+
     .stat-value {
         @apply text-3xl font-bold mb-2;
         color: var(--color-primary);
     }
-    
+
     .stat-label {
         @apply text-sm font-medium;
         color: var(--color-text-secondary);
@@ -180,28 +219,28 @@
     .text-primary {
         color: var(--color-primary);
     }
-    
+
     .bg-primary {
         background-color: var(--color-primary);
     }
-    
+
     .border-primary {
         border-color: var(--color-primary);
     }
-    
+
     .scrollbar-thin {
         scrollbar-width: thin;
         scrollbar-color: var(--color-text-muted) transparent;
     }
-    
+
     .scrollbar-thin::-webkit-scrollbar {
         width: 6px;
     }
-    
+
     .scrollbar-thin::-webkit-scrollbar-track {
         background: transparent;
     }
-    
+
     .scrollbar-thin::-webkit-scrollbar-thumb {
         background-color: var(--color-text-muted);
         border-radius: 3px;
@@ -238,7 +277,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background-image: 
+    background-image:
         radial-gradient(circle at 20% 50%, rgba(56, 182, 113, 0.1) 0%, transparent 50%),
         radial-gradient(circle at 80% 80%, rgba(56, 182, 113, 0.1) 0%, transparent 50%),
         radial-gradient(circle at 40% 20%, rgba(56, 182, 113, 0.05) 0%, transparent 50%);
@@ -348,16 +387,45 @@
     }
 }
 
-/* Mobile logo for auth screens */
-@media (max-width: 1024px) {
-    .auth-container::before {
-        content: '';
-        display: block;
-        width: 64px;
-        height: 64px;
-        margin: 0 auto 2rem;
-        background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
-        border-radius: 1rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+/* Mobile Overlay */
+.mobile-overlay {
+    @apply fixed inset-0 bg-black/50 z-30 lg:hidden;
+}
+
+/* Responsive Table Cards */
+@media (max-width: 768px) {
+    .responsive-table-row {
+        @apply block border-b border-neutral-200 p-4;
+    }
+
+    .responsive-table-row td {
+        @apply block px-0 py-2;
+    }
+
+    .responsive-table-row td::before {
+        content: attr(data-label);
+        @apply font-semibold text-neutral-700 inline-block w-32;
+    }
+}
+
+/* Responsive Stats Grid */
+@media (max-width: 640px) {
+    .stat-card {
+        @apply p-4;
+    }
+
+    .stat-value {
+        @apply text-2xl;
+    }
+}
+
+/* Responsive Forms */
+@media (max-width: 768px) {
+    .dashboard-card {
+        @apply p-4 rounded-lg;
+    }
+
+    .card-title {
+        @apply text-base;
     }
 }

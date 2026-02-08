@@ -6,7 +6,7 @@
     </x-slot>
 
     <!-- Stats Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6 px-4 sm:px-0">
         <!-- Stat Card 1 -->
         <div class="stat-card">
             <div class="flex items-center justify-between mb-4">
@@ -85,7 +85,7 @@
     </div>
 
     <!-- Content Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 px-4 sm:px-0">
         <!-- Recent Activity -->
         <div class="lg:col-span-2">
             <div class="dashboard-card">

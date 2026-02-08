@@ -14,10 +14,22 @@
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="font-sans antialiased" x-data="{ sidebarCollapsed: false }">
+    <body class="font-sans antialiased" x-data="{ sidebarCollapsed: false, mobileSidebarOpen: false }">
+        <!-- Mobile Overlay -->
+        <div x-show="mobileSidebarOpen"
+             @click="mobileSidebarOpen = false"
+             x-transition:enter="transition-opacity ease-linear duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition-opacity ease-linear duration-300"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="mobile-overlay"
+             style="display: none;"></div>
+
         <div class="min-h-screen bg-neutral-50">
             <!-- Sidebar -->
-            <aside :class="sidebarCollapsed ? 'collapsed' : ''" class="sidebar">
+            <aside :class="{ 'collapsed': sidebarCollapsed, 'mobile-open': mobileSidebarOpen }" class="sidebar">
                 <!-- Sidebar Header -->
                 <div class="sidebar-header">
                     <div class="flex items-center gap-3">
@@ -38,14 +50,14 @@
                     @foreach(config('navigation.sidebar') as $item)
                         @if($item['type'] === 'divider')
                             <div class="my-4 border-t border-primary-700"></div>
-                        
+
                         @elseif($item['type'] === 'heading')
                             @if(!isset($item['permission']) || auth()->user()->can($item['permission']))
                                 <div x-show="!sidebarCollapsed" class="px-4 py-2">
                                     <span class="text-xs font-semibold text-primary-300 uppercase tracking-wider">{{ $item['name'] }}</span>
                                 </div>
                             @endif
-                        
+
                         @elseif($item['type'] === 'logout')
                             @if(!isset($item['permission']) || auth()->user()->can($item['permission']))
                                 <form method="POST" action="{{ route($item['route']) }}">
@@ -58,10 +70,10 @@
                                     </button>
                                 </form>
                             @endif
-                        
+
                         @elseif($item['type'] === 'link')
                             @if(!isset($item['permission']) || auth()->user()->can($item['permission']))
-                                <a href="{{ $item['route'] === '#' ? '#' : route($item['route']) }}" 
+                                <a href="{{ $item['route'] === '#' ? '#' : route($item['route']) }}"
                                    class="sidebar-link {{ $item['active_pattern'] && request()->routeIs($item['active_pattern']) ? 'active' : '' }}">
                                     <svg class="sidebar-link-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         {!! $item['icon'] !!}
@@ -82,11 +94,19 @@
                         <!-- Left Side -->
                         <div class="flex items-center gap-4">
                             <!-- Sidebar Toggle Button -->
-                            <button @click="sidebarCollapsed = !sidebarCollapsed" class="sidebar-toggle bg-neutral-100 text-neutral-700">
+                            <!-- Mobile Menu Button -->
+                            <button @click="mobileSidebarOpen = !mobileSidebarOpen" class="lg:hidden sidebar-toggle bg-neutral-100 text-neutral-700">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path x-show="!sidebarCollapsed" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                            </button>
+
+                            <!-- Desktop Sidebar Toggle -->
+                            <button @click="sidebarCollapsed = !sidebarCollapsed" class="hidden lg:block sidebar-toggle bg-neutral-100 text-neutral-700">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path x-show="!sidebarCollapsed" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M4 6h16M4 12h16M4 18h16" />
-                                    <path x-show="sidebarCollapsed" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                    <path x-show="sidebarCollapsed" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M4 6h16M4 12h8m-8 6h16" />
                                 </svg>
                             </button>
@@ -103,14 +123,14 @@
                         <div class="flex items-center gap-4">
                             <!-- Search -->
                             <div class="hidden md:block">
-                                <input type="search" placeholder="Search..." 
+                                <input type="search" placeholder="Search..."
                                        class="px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
                             </div>
 
                             <!-- Notifications -->
                             <button class="relative p-2 text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                                 </svg>
                                 <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -129,9 +149,9 @@
                                 </button>
 
                                 <!-- Dropdown -->
-                                <div x-show="open" @click.away="open = false" 
-                                     x-transition:enter="transition ease-out duration-200" 
-                                     x-transition:enter-start="opacity-0 scale-95" 
+                                <div x-show="open" @click.away="open = false"
+                                     x-transition:enter="transition ease-out duration-200"
+                                     x-transition:enter-start="opacity-0 scale-95"
                                      x-transition:enter-end="opacity-100 scale-100"
                                      x-transition:leave="transition ease-in duration-75"
                                      x-transition:leave-start="opacity-100 scale-100"

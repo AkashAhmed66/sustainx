@@ -5,7 +5,7 @@
         </h2>
     </x-slot>
 
-    <div class="p-6 max-w-4xl">
+    <div class="p-4 sm:p-6 max-w-4xl">
         <div class="dashboard-card">
             <div class="p-6">
                 <form action="{{ route('users.update', $user) }}" method="POST">
@@ -18,9 +18,9 @@
                             <label for="name" class="block text-sm font-medium text-neutral-700 mb-2">
                                 Full Name <span class="text-red-500">*</span>
                             </label>
-                            <input type="text" 
-                                   name="name" 
-                                   id="name" 
+                            <input type="text"
+                                   name="name"
+                                   id="name"
                                    value="{{ old('name', $user->name) }}"
                                    required
                                    class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('name') border-red-500 @enderror"
@@ -35,9 +35,9 @@
                             <label for="email" class="block text-sm font-medium text-neutral-700 mb-2">
                                 Email Address <span class="text-red-500">*</span>
                             </label>
-                            <input type="email" 
-                                   name="email" 
-                                   id="email" 
+                            <input type="email"
+                                   name="email"
+                                   id="email"
                                    value="{{ old('email', $user->email) }}"
                                    required
                                    class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('email') border-red-500 @enderror"
@@ -52,9 +52,9 @@
                             <label for="password" class="block text-sm font-medium text-neutral-700 mb-2">
                                 New Password <span class="text-neutral-400">(Leave blank to keep current)</span>
                             </label>
-                            <input type="password" 
-                                   name="password" 
-                                   id="password" 
+                            <input type="password"
+                                   name="password"
+                                   id="password"
                                    class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('password') border-red-500 @enderror"
                                    placeholder="••••••••">
                             @error('password')
@@ -67,9 +67,9 @@
                             <label for="password_confirmation" class="block text-sm font-medium text-neutral-700 mb-2">
                                 Confirm New Password
                             </label>
-                            <input type="password" 
-                                   name="password_confirmation" 
-                                   id="password_confirmation" 
+                            <input type="password"
+                                   name="password_confirmation"
+                                   id="password_confirmation"
                                    class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                    placeholder="••••••••">
                         </div>
@@ -83,8 +83,8 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                             @foreach($roles as $role)
                             <label class="flex items-center p-3 border border-neutral-200 rounded-lg hover:bg-neutral-50 cursor-pointer transition-colors">
-                                <input type="checkbox" 
-                                       name="roles[]" 
+                                <input type="checkbox"
+                                       name="roles[]"
                                        value="{{ $role->id }}"
                                        {{ in_array($role->id, old('roles', $userRoles)) ? 'checked' : '' }}
                                        class="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500 mr-3">
@@ -102,11 +102,11 @@
 
                     <!-- Action Buttons -->
                     <div class="flex items-center justify-end gap-3 pt-6 border-t border-neutral-200">
-                        <a href="{{ route('users.index') }}" 
+                        <a href="{{ route('users.index') }}"
                            class="px-6 py-3 rounded-xl font-medium border border-neutral-300 text-neutral-700 hover:bg-neutral-50 transition-colors">
                             Cancel
                         </a>
-                        <button type="submit" 
+                        <button type="submit"
                                 class="btn-primary">
                             <svg class="w-5 h-5 mr-2 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
