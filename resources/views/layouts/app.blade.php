@@ -95,14 +95,14 @@
                         <div class="flex items-center gap-4">
                             <!-- Sidebar Toggle Button -->
                             <!-- Mobile Menu Button -->
-                            <button @click="mobileSidebarOpen = !mobileSidebarOpen" class="lg:hidden sidebar-toggle bg-neutral-100 text-neutral-700">
+                            <button @click="mobileSidebarOpen = !mobileSidebarOpen" class="lg:hidden flex items-center justify-center w-10 h-10 rounded-lg bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                                 </svg>
                             </button>
 
                             <!-- Desktop Sidebar Toggle -->
-                            <button @click="sidebarCollapsed = !sidebarCollapsed" class="hidden lg:block sidebar-toggle bg-neutral-100 text-neutral-700">
+                            <button @click="sidebarCollapsed = !sidebarCollapsed" class="hidden lg:flex items-center justify-center w-10 h-10 rounded-lg bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path x-show="!sidebarCollapsed" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M4 6h16M4 12h16M4 18h16" />

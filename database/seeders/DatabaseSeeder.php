@@ -174,13 +174,11 @@ class DatabaseSeeder extends Seeder
         // Step 4: Seed Question Types
         $this->command->info('❓ Creating question types...');
         $questionTypes = [
-            ['name' => 'numeric'],
-            ['name' => 'text'],
-            ['name' => 'boolean'],
-            ['name' => 'mcq'],
+            ['id' => 1, 'name' => 'numeric'],
+            ['id' => 2, 'name' => 'mcq'],
         ];
         foreach ($questionTypes as $type) {
-            QuestionType::firstOrCreate($type);
+            QuestionType::updateOrCreate(['id' => $type['id']], $type);
         }
         $this->command->info('✅ Created ' . count($questionTypes) . ' question types');
 
@@ -314,8 +312,6 @@ class DatabaseSeeder extends Seeder
         // Step 10: Seed Questions
         $this->command->info('❔ Creating questions...');
         $numericType = QuestionType::where('name', 'numeric')->first();
-        $textType = QuestionType::where('name', 'text')->first();
-        $booleanType = QuestionType::where('name', 'boolean')->first();
         $mcqType = QuestionType::where('name', 'mcq')->first();
 
         $questions = [
@@ -323,12 +319,12 @@ class DatabaseSeeder extends Seeder
             ['item' => 'Renewable Energy Usage', 'question_text' => 'What percentage of your energy comes from renewable sources?', 'type' => $numericType->id, 'unit' => '%', 'is_required' => true],
             ['item' => 'GHG Emissions', 'question_text' => 'What are your total GHG emissions?', 'type' => $numericType->id, 'unit' => 'tCO2e', 'is_required' => true],
             ['item' => 'Water Consumption', 'question_text' => 'What is your total annual water consumption?', 'type' => $numericType->id, 'unit' => 'm³', 'is_required' => true],
-            ['item' => 'Wastewater Treatment', 'question_text' => 'Do you have a wastewater treatment facility?', 'type' => $booleanType->id, 'unit' => null, 'is_required' => true],
+            ['item' => 'Wastewater Treatment', 'question_text' => 'Do you have a wastewater treatment facility?', 'type' => $mcqType->id, 'unit' => null, 'is_required' => true],
             ['item' => 'Water Recycling', 'question_text' => 'What percentage of water is recycled?', 'type' => $numericType->id, 'unit' => '%', 'is_required' => false],
             ['item' => 'Total Waste Generated', 'question_text' => 'What is your total annual waste generation?', 'type' => $numericType->id, 'unit' => 'tonnes', 'is_required' => true],
             ['item' => 'Waste Recycled', 'question_text' => 'What percentage of waste is recycled?', 'type' => $numericType->id, 'unit' => '%', 'is_required' => true],
             ['item' => 'Employee Count', 'question_text' => 'How many employees do you have?', 'type' => $numericType->id, 'unit' => 'employees', 'is_required' => true],
-            ['item' => 'Fair Wages', 'question_text' => 'Do you pay living wages to all employees?', 'type' => $booleanType->id, 'unit' => null, 'is_required' => true],
+            ['item' => 'Fair Wages', 'question_text' => 'Do you pay living wages to all employees?', 'type' => $mcqType->id, 'unit' => null, 'is_required' => true],
             ['item' => 'Working Hours', 'question_text' => 'What is the average working hours per week?', 'type' => $numericType->id, 'unit' => 'hours', 'is_required' => true],
             ['item' => 'Safety Training', 'question_text' => 'What percentage of employees completed safety training?', 'type' => $numericType->id, 'unit' => '%', 'is_required' => true],
             ['item' => 'Accident Rate', 'question_text' => 'How would you rate your workplace safety?', 'type' => $mcqType->id, 'unit' => null, 'is_required' => true],
@@ -349,18 +345,42 @@ class DatabaseSeeder extends Seeder
 
         // Step 11: Seed Options for MCQ questions
         $this->command->info('📊 Creating MCQ options...');
+        
+        // Options for workplace safety rating
         $mcqQuestion = $questionModels['How would you rate your workplace safety?'];
-        $options = [
+        $safetyOptions = [
             ['question_id' => $mcqQuestion->id, 'option_text' => 'Excellent', 'option_value' => 5, 'order_no' => 1],
             ['question_id' => $mcqQuestion->id, 'option_text' => 'Good', 'option_value' => 4, 'order_no' => 2],
             ['question_id' => $mcqQuestion->id, 'option_text' => 'Average', 'option_value' => 3, 'order_no' => 3],
             ['question_id' => $mcqQuestion->id, 'option_text' => 'Poor', 'option_value' => 2, 'order_no' => 4],
             ['question_id' => $mcqQuestion->id, 'option_text' => 'Very Poor', 'option_value' => 1, 'order_no' => 5],
         ];
-        foreach ($options as $option) {
+        foreach ($safetyOptions as $option) {
             Option::create($option);
         }
-        $this->command->info('✅ Created ' . count($options) . ' options');
+
+        // Options for wastewater treatment (Yes/No)
+        $wastewaterQuestion = $questionModels['Do you have a wastewater treatment facility?'];
+        $yesNoOptions1 = [
+            ['question_id' => $wastewaterQuestion->id, 'option_text' => 'Yes', 'option_value' => 1, 'order_no' => 1],
+            ['question_id' => $wastewaterQuestion->id, 'option_text' => 'No', 'option_value' => 0, 'order_no' => 2],
+        ];
+        foreach ($yesNoOptions1 as $option) {
+            Option::create($option);
+        }
+
+        // Options for fair wages (Yes/No)
+        $fairWagesQuestion = $questionModels['Do you pay living wages to all employees?'];
+        $yesNoOptions2 = [
+            ['question_id' => $fairWagesQuestion->id, 'option_text' => 'Yes', 'option_value' => 1, 'order_no' => 1],
+            ['question_id' => $fairWagesQuestion->id, 'option_text' => 'No', 'option_value' => 0, 'order_no' => 2],
+        ];
+        foreach ($yesNoOptions2 as $option) {
+            Option::create($option);
+        }
+
+        $totalOptions = count($safetyOptions) + count($yesNoOptions1) + count($yesNoOptions2);
+        $this->command->info('✅ Created ' . $totalOptions . ' options');
 
         // Step 12: Seed Factories
         $this->command->info('🏢 Creating sample factories...');

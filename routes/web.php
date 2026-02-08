@@ -19,7 +19,16 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', function () {
-    return view('dashboard');
+    $sections = \App\Models\Section::with(['subsections' => function($q) {
+        $q->where('is_active', true)->orderBy('order_no');
+    }])->where('is_active', true)
+      ->orderBy('order_no')
+      ->get();
+    
+    $totalFactories = \App\Models\Factory::count();
+    $respondedFactories = \App\Models\Assessment::distinct('factory_id')->count();
+    
+    return view('dashboard', compact('sections', 'totalFactories', 'respondedFactories'));
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
@@ -200,11 +209,15 @@ Route::middleware('auth')->group(function () {
     // Assessment Management Routes
     Route::middleware('permission:view assessments')->group(function () {
         Route::get('/assessments', [AssessmentController::class, 'index'])->name('assessments.index');
-        Route::get('/assessments/{assessment}', [AssessmentController::class, 'show'])->name('assessments.show');
     });
     Route::middleware('permission:create assessments')->group(function () {
         Route::get('/assessments/create', [AssessmentController::class, 'create'])->name('assessments.create');
         Route::post('/assessments', [AssessmentController::class, 'store'])->name('assessments.store');
+    });
+    Route::middleware('permission:view assessments')->group(function () {
+        Route::get('/assessments/{assessment}', [AssessmentController::class, 'show'])->name('assessments.show');
+        Route::get('/assessments/{assessment}/perform', [AssessmentController::class, 'perform'])->name('assessments.perform');
+        Route::post('/assessments/{assessment}/perform', [AssessmentController::class, 'storeAnswers'])->name('assessments.storeAnswers');
     });
     Route::middleware('permission:edit assessments')->group(function () {
         Route::get('/assessments/{assessment}/edit', [AssessmentController::class, 'edit'])->name('assessments.edit');
