@@ -12,24 +12,21 @@ use App\Http\Controllers\CountryController;
 use App\Http\Controllers\FactoryTypeController;
 use App\Http\Controllers\FactoryController;
 use App\Http\Controllers\AssessmentController;
+use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
+    // return view('welcome');
 });
 
-Route::get('/dashboard', function () {
-    $sections = \App\Models\Section::with(['subsections' => function($q) {
-        $q->where('is_active', true)->orderBy('order_no');
-    }])->where('is_active', true)
-      ->orderBy('order_no')
-      ->get();
-    
-    $totalFactories = \App\Models\Factory::count();
-    $respondedFactories = \App\Models\Assessment::distinct('factory_id')->count();
-    
-    return view('dashboard', compact('sections', 'totalFactories', 'respondedFactories'));
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
+
+Route::get('/dashboard/subsection/{subsection}', [DashboardController::class, 'subsectionDetails'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard.subsection');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -222,6 +219,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:edit assessments')->group(function () {
         Route::get('/assessments/{assessment}/edit', [AssessmentController::class, 'edit'])->name('assessments.edit');
         Route::put('/assessments/{assessment}', [AssessmentController::class, 'update'])->name('assessments.update');
+        Route::post('/assessments/{assessment}/approve', [AssessmentController::class, 'approve'])->name('assessments.approve');
+        Route::post('/assessments/{assessment}/reject', [AssessmentController::class, 'reject'])->name('assessments.reject');
     });
     Route::middleware('permission:delete assessments')->group(function () {
         Route::delete('/assessments/{assessment}', [AssessmentController::class, 'destroy'])->name('assessments.destroy');

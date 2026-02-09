@@ -100,6 +100,31 @@
                         @enderror
                     </div>
 
+                    <!-- Users -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-neutral-700 mb-2">
+                            Assign Users
+                        </label>
+                        <div class="border border-neutral-300 rounded-xl p-4 max-h-60 overflow-y-auto @error('user_ids') border-red-500 @enderror">
+                            @forelse($users as $user)
+                                <label class="flex items-center py-2 hover:bg-neutral-50 px-2 rounded cursor-pointer">
+                                    <input type="checkbox"
+                                           name="user_ids[]"
+                                           value="{{ $user->id }}"
+                                           {{ in_array($user->id, old('user_ids', [])) ? 'checked' : '' }}
+                                           class="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500">
+                                    <span class="ml-3 text-sm text-neutral-700">{{ $user->name }} ({{ $user->email }})</span>
+                                </label>
+                            @empty
+                                <p class="text-sm text-neutral-500 text-center py-2">No users available</p>
+                            @endforelse
+                        </div>
+                        @error('user_ids')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                        <p class="mt-2 text-xs text-neutral-500">Select users who should have access to this factory</p>
+                    </div>
+
                     <!-- Action Buttons -->
                     <div class="flex items-center justify-end gap-3 pt-6 border-t">
                         <a href="{{ route('factories.index') }}"

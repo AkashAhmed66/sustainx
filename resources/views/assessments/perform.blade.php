@@ -1,20 +1,21 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <h2 class="font-semibold text-xl text-neutral-800">
-                {{ __('Perform Assessment') }}
-            </h2>
+        <h2 class="font-semibold text-xl text-neutral-800">
+            {{ __('Perform Assessment') }}
+        </h2>
+    </x-slot>
+
+    <div class="p-4 sm:p-6">
+        <!-- Action Buttons -->
+        <div class="flex items-center justify-end mb-6">
             <a href="{{ route('assessments.show', $assessment) }}"
-               class="inline-flex items-center px-4 py-2 text-neutral-700 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors font-medium ml-2">
+               class="inline-flex items-center justify-center px-4 py-2 text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors font-medium w-full sm:w-auto">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
                 </svg>
                 Back to Details
             </a>
         </div>
-    </x-slot>
-
-    <div class="p-4 sm:p-6">
         <!-- Assessment Summary Card -->
         <div class="dashboard-card mb-6">
             <div class="p-6">
@@ -37,10 +38,11 @@
                         <label class="block text-sm font-medium text-neutral-500 mb-1">Status</label>
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
                             @if($assessment->status === 'approved') bg-green-100 text-green-800
-                            @elseif($assessment->status === 'submitted') bg-blue-100 text-blue-800
+                            @elseif($assessment->status === 'in_review') bg-blue-100 text-blue-800
+                            @elseif($assessment->status === 'submitted') bg-indigo-100 text-indigo-800
                             @else bg-yellow-100 text-yellow-800
                             @endif">
-                            {{ ucfirst($assessment->status) }}
+                            {{ $assessment->status === 'in_review' ? 'In Review' : ucfirst(str_replace('_', ' ', $assessment->status)) }}
                         </span>
                     </div>
                 </div>
@@ -111,10 +113,26 @@
                                                                 <input type="number" 
                                                                        name="{{ $fieldName }}[value]"
                                                                        step="any"
-                                                                       value="{{ old($fieldName . '.value', $existingAnswer->numeric_value ?? '') }}"
-                                                                       class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                                                       value="{{ old($fieldName . '.value', $existingAnswer->actual_answer ?? $existingAnswer->numeric_value ?? '') }}"
+                                                                       class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'bg-neutral-50 cursor-not-allowed' : '' }}"
                                                                        placeholder="Enter numeric value"
-                                                                       {{ $question->is_required ? 'required' : '' }}>
+                                                                       {{ $question->is_required ? 'required' : '' }}
+                                                                       {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'readonly' : '' }}>
+                                                                
+                                                                @if($existingAnswer && $question->equation && $question->equation->factors->count() > 0)
+                                                                    <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                                                        <p class="text-xs font-medium text-green-800 mb-1">
+                                                                            <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                                                            </svg>
+                                                                            Saved Answer
+                                                                        </p>
+                                                                        <div class="text-xs text-green-700 space-y-1">
+                                                                            <p><strong>Actual Answer (Your Input):</strong> {{ number_format($existingAnswer->actual_answer, 4) }} {{ $question->unit }}</p>
+                                                                            <p><strong>Calculated Answer:</strong> {{ number_format($existingAnswer->numeric_value, 4) }} {{ $question->unit }}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                @endif
                                                                 
                                                                 @if($question->equation && $question->equation->factors->count() > 0)
                                                                     <div class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -148,13 +166,14 @@
                                                         @elseif($question->question_type_id == 2)
                                                             <div class="space-y-2">
                                                                 @forelse($question->options as $option)
-                                                                    <label class="flex items-center p-3 border border-neutral-200 rounded-lg hover:bg-neutral-50 cursor-pointer transition-colors">
+                                                                    <label class="flex items-center p-3 border border-neutral-200 rounded-lg hover:bg-neutral-50 cursor-pointer transition-colors {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'opacity-60 cursor-not-allowed' : '' }}">
                                                                         <input type="radio" 
                                                                                name="{{ $fieldName }}[option_id]"
                                                                                value="{{ $option->id }}"
                                                                                {{ old($fieldName . '.option_id', $existingAnswer->option_id ?? '') == $option->id ? 'checked' : '' }}
                                                                                class="w-4 h-4 text-primary-600 border-neutral-300 focus:ring-primary-500"
-                                                                               {{ $question->is_required ? 'required' : '' }}>
+                                                                               {{ $question->is_required ? 'required' : '' }}
+                                                                               {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'disabled' : '' }}>
                                                                         <span class="ml-3 text-sm text-neutral-800">
                                                                             {{ $option->option_text }}
                                                                             @if($option->option_value !== null)
@@ -203,15 +222,33 @@
 
             <!-- Submit Button -->
             @if($sections->count() > 0)
-                <div class="mt-6 flex items-center justify-end gap-3">
+                <div class="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
                     <a href="{{ route('assessments.show', $assessment) }}"
-                       class="px-6 py-2.5 text-neutral-700 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors font-medium">
+                       class="px-6 py-2.5 text-neutral-700 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors font-medium text-center">
                         Cancel
                     </a>
-                    <button type="submit"
-                            class="btn-primary">
-                        Save Answers
-                    </button>
+                    @if($assessment->status !== 'approved' && $assessment->status !== 'in_review')
+                        <button type="submit"
+                                name="submit_action"
+                                value="save"
+                                class="px-6 py-2.5 bg-white text-primary-600 border border-primary-600 rounded-lg hover:bg-primary-50 transition-colors font-medium">
+                            Save Answers
+                        </button>
+                        <button type="submit"
+                                name="submit_action"
+                                value="submit"
+                                class="btn-primary"
+                                onclick="return confirm('Are you sure you want to submit this assessment for review? You will not be able to edit it after submission.')">
+                            <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            Submit for Review
+                        </button>
+                    @else
+                        <div class="px-6 py-2.5 bg-neutral-100 text-neutral-500 rounded-lg font-medium text-center">
+                            Assessment is {{ $assessment->status === 'approved' ? 'approved' : 'under review' }} and cannot be edited
+                        </div>
+                    @endif
                 </div>
             @endif
         </form>

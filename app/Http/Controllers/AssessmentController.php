@@ -227,6 +227,7 @@ class AssessmentController extends Controller
             'answers.*.item_id' => 'required|exists:items,id',
             'answers.*.value' => 'nullable',
             'answers.*.option_id' => 'nullable|exists:options,id',
+            'submit_action' => 'nullable|in:save,submit',
         ]);
 
         DB::beginTransaction();
@@ -251,10 +252,13 @@ class AssessmentController extends Controller
                     // Numeric type - perform calculation if factors exist
                     $inputValue = floatval($answerData['value'] ?? 0);
                     
+                    // Store actual answer (user input)
+                    $dataToSave['actual_answer'] = $inputValue;
+                    
                     if ($question->equation && $question->equation->factors->count() > 0) {
                         $result = $inputValue;
                         
-                        // Apply factors sequentially
+                        // Apply factors sequentially for calculated answer
                         foreach ($question->equation->factors as $factor) {
                             switch ($factor->operation) {
                                 case 'multiply':
@@ -274,9 +278,10 @@ class AssessmentController extends Controller
                             }
                         }
                         
+                        // Store calculated answer
                         $dataToSave['numeric_value'] = $result;
                     } else {
-                        // No factors, just store the input value
+                        // No factors, calculated answer is same as actual answer
                         $dataToSave['numeric_value'] = $inputValue;
                     }
                     
@@ -286,6 +291,7 @@ class AssessmentController extends Controller
                     // MCQ type - store option_id
                     $dataToSave['option_id'] = $answerData['option_id'] ?? null;
                     $dataToSave['numeric_value'] = null;
+                    $dataToSave['actual_answer'] = null;
                     $dataToSave['text_value'] = null;
                 }
 
@@ -299,6 +305,17 @@ class AssessmentController extends Controller
                 );
             }
 
+            // Check if submitting for review
+            if ($request->submit_action === 'submit') {
+                $assessment->update([
+                    'status' => 'in_review',
+                    'submitted_at' => now(),
+                ]);
+                DB::commit();
+                return redirect()->route('assessments.show', $assessment)
+                    ->with('success', 'Assessment submitted for review successfully.');
+            }
+
             DB::commit();
             return redirect()->route('assessments.show', $assessment)
                 ->with('success', 'Assessment answers saved successfully.');
@@ -308,5 +325,41 @@ class AssessmentController extends Controller
                 ->withInput()
                 ->with('error', 'Failed to save answers: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Approve the assessment (admin only).
+     */
+    public function approve(Assessment $assessment)
+    {
+        if ($assessment->status !== 'in_review') {
+            return redirect()->route('assessments.show', $assessment)
+                ->with('error', 'Only assessments in review can be approved.');
+        }
+
+        $assessment->update([
+            'status' => 'approved',
+        ]);
+
+        return redirect()->route('assessments.show', $assessment)
+            ->with('success', 'Assessment approved successfully.');
+    }
+
+    /**
+     * Reject the assessment (admin only).
+     */
+    public function reject(Assessment $assessment)
+    {
+        if ($assessment->status !== 'in_review') {
+            return redirect()->route('assessments.show', $assessment)
+                ->with('error', 'Only assessments in review can be rejected.');
+        }
+
+        $assessment->update([
+            'status' => 'draft',
+        ]);
+
+        return redirect()->route('assessments.show', $assessment)
+            ->with('success', 'Assessment rejected and returned to draft status.');
     }
 }

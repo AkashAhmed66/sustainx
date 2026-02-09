@@ -1,26 +1,68 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <h2 class="font-semibold text-xl text-neutral-800">
-                {{ __('Assessment Details') }}
-            </h2>
-            <div class="flex items-center gap-3 ml-2">
-                <a href="{{ route('assessments.perform', $assessment) }}"
-                   class="btn-primary">
-                    Perform Assessment
-                </a>
-                <a href="{{ route('assessments.index') }}"
-                   class="inline-flex items-center px-4 py-2 text-neutral-700 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors font-medium">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                    </svg>
-                    Back to List
-                </a>
-            </div>
-        </div>
+        <h2 class="font-semibold text-xl text-neutral-800">
+            {{ __('Assessment Details') }}
+        </h2>
     </x-slot>
 
     <div class="p-4 sm:p-6">
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 mb-6">
+            <a href="{{ route('assessments.index') }}"
+               class="inline-flex items-center justify-center px-4 py-2 text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors font-medium">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Back to List
+            </a>
+            @if($assessment->status !== 'approved' && $assessment->status !== 'in_review')
+                <a href="{{ route('assessments.perform', $assessment) }}"
+                   class="btn-primary inline-flex items-center justify-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Perform Assessment
+                </a>
+            @endif
+        </div>
+
+        <!-- Admin Approval Actions -->
+        @if($assessment->status === 'in_review' && auth()->user()->can('edit assessments'))
+            <div class="dashboard-card mb-6 border-l-4 border-blue-500">
+                <div class="p-6">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <h3 class="text-lg font-semibold text-neutral-800 mb-1">Assessment Review Required</h3>
+                            <p class="text-sm text-neutral-600">This assessment has been submitted and is awaiting your review.</p>
+                        </div>
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                            <form action="{{ route('assessments.reject', $assessment) }}" method="POST" class="w-full sm:w-auto">
+                                @csrf
+                                <button type="submit"
+                                        onclick="return confirm('Are you sure you want to reject this assessment? It will be returned to draft status.')"
+                                        class="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2.5 bg-white text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition-colors font-medium">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                    Reject
+                                </button>
+                            </form>
+                            <form action="{{ route('assessments.approve', $assessment) }}" method="POST" class="w-full sm:w-auto">
+                                @csrf
+                                <button type="submit"
+                                        onclick="return confirm('Are you sure you want to approve this assessment? This action will finalize the assessment.')"
+                                        class="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    Approve
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
         <!-- Assessment Summary Card -->
         <div class="dashboard-card mb-6">
             <div class="p-6">
@@ -56,10 +98,11 @@
                         <label class="block text-sm font-medium text-neutral-500 mb-1">Status</label>
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
                             @if($assessment->status === 'approved') bg-green-100 text-green-800
-                            @elseif($assessment->status === 'submitted') bg-blue-100 text-blue-800
+                            @elseif($assessment->status === 'in_review') bg-blue-100 text-blue-800
+                            @elseif($assessment->status === 'submitted') bg-indigo-100 text-indigo-800
                             @else bg-yellow-100 text-yellow-800
                             @endif">
-                            {{ ucfirst($assessment->status) }}
+                            {{ $assessment->status === 'in_review' ? 'In Review' : ucfirst(str_replace('_', ' ', $assessment->status)) }}
                         </span>
                     </div>
 

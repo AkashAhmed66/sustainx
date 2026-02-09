@@ -14,12 +14,14 @@ class Answer extends Model
         'question_id',
         'item_id',
         'numeric_value',
+        'actual_answer',
         'text_value',
         'option_id',
     ];
 
     protected $casts = [
         'numeric_value' => 'decimal:4',
+        'actual_answer' => 'decimal:4',
     ];
 
     /**
