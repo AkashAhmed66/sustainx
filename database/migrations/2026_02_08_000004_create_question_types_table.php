@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('question_types', function (Blueprint $table) {
             $table->id();
-            $table->string('name'); // numeric, text, boolean, mcq
+            $table->string('name'); // numeric, mcq
             $table->timestamps();
         });
     }

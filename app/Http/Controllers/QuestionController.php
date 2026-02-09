@@ -5,7 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Question;
 use App\Models\Item;
 use App\Models\QuestionType;
+use App\Models\Equation;
+use App\Models\Factor;
+use App\Models\Option;
+use App\Models\Country;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class QuestionController extends Controller
 {
@@ -79,7 +84,13 @@ class QuestionController extends Controller
             ->orderBy('order_no')
             ->get();
         $questionTypes = QuestionType::all();
-        return view('questions.create', compact('items', 'questionTypes'));
+        $countries = Country::orderBy('name')->get();
+        
+        // Prepare default data for Alpine.js
+        $defaultOptions = json_encode([['option_text' => '', 'option_value' => '', 'order_no' => 1]]);
+        $defaultFactors = json_encode([['sn' => 1, 'operation' => 'multiply', 'factor_value' => '', 'country_id' => '']]);
+        
+        return view('questions.create', compact('items', 'questionTypes', 'countries', 'defaultOptions', 'defaultFactors'));
     }
 
     /**
@@ -87,19 +98,104 @@ class QuestionController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        // Base validation rules
+        $rules = [
             'item_id' => 'required|exists:items,id',
             'question_text' => 'required|string',
             'question_type_id' => 'required|exists:question_types,id',
             'unit' => 'nullable|string|max:255',
             'is_required' => 'boolean',
             'is_active' => 'boolean',
-        ]);
+        ];
 
-        Question::create($validated);
+        // Add conditional validation based on question type
+        if ($request->question_type_id == 1) {
+            // Numeric type - validate equation and factors
+            $rules['equation_name'] = 'nullable|string|max:255';
+            $rules['factors'] = 'nullable|array';
+            $rules['factors.*.sn'] = 'nullable|integer|min:1';
+            $rules['factors.*.operation'] = 'nullable|string|in:multiply,add,subtract,divide';
+            $rules['factors.*.factor_value'] = 'nullable|numeric';
+            $rules['factors.*.country_id'] = 'nullable|exists:countries,id';
+        } elseif ($request->question_type_id == 2) {
+            // MCQ type - validate options
+            $rules['options'] = 'nullable|array';
+            $rules['options.*.option_text'] = 'nullable|string|max:255';
+            $rules['options.*.option_value'] = 'nullable|numeric';
+            $rules['options.*.order_no'] = 'nullable|integer|min:1';
+        }
 
-        return redirect()->route('questions.index')
-            ->with('success', 'Question created successfully.');
+        $validated = $request->validate($rules);
+
+        DB::beginTransaction();
+        try {
+            // Create question
+            $question = Question::create([
+                'item_id' => $validated['item_id'],
+                'question_text' => $validated['question_text'],
+                'question_type_id' => $validated['question_type_id'],
+                'unit' => $validated['unit'] ?? null,
+                'is_required' => $request->has('is_required'),
+                'is_active' => $request->has('is_active'),
+            ]);
+
+            // Handle numeric type - create equation and factors
+            if ($validated['question_type_id'] == 1) {
+                $hasFactors = !empty($validated['factors']) && collect($validated['factors'])->filter(function($factor) {
+                    return !empty($factor['factor_value']);
+                })->count() > 0;
+                
+                if ($hasFactors || !empty($validated['equation_name'])) {
+                    $equation = Equation::create([
+                        'question_id' => $question->id,
+                        'name' => $validated['equation_name'] ?? 'Equation',
+                    ]);
+
+                    if ($hasFactors) {
+                        foreach ($validated['factors'] as $factorData) {
+                            if (!empty($factorData['factor_value'])) {
+                                Factor::create([
+                                    'equation_id' => $equation->id,
+                                    'sn' => $factorData['sn'],
+                                    'operation' => $factorData['operation'],
+                                    'factor_value' => $factorData['factor_value'],
+                                    'country_id' => $factorData['country_id'] ?? null,
+                                ]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Handle MCQ type - create options
+            if ($validated['question_type_id'] == 2) {
+                $hasOptions = !empty($validated['options']) && collect($validated['options'])->filter(function($option) {
+                    return !empty($option['option_text']);
+                })->count() > 0;
+                
+                if ($hasOptions) {
+                    foreach ($validated['options'] as $optionData) {
+                        if (!empty($optionData['option_text'])) {
+                            Option::create([
+                                'question_id' => $question->id,
+                                'option_text' => $optionData['option_text'],
+                                'option_value' => $optionData['option_value'] ?? null,
+                                'order_no' => $optionData['order_no'],
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            DB::commit();
+            return redirect()->route('questions.index')
+                ->with('success', 'Question created successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Failed to create question: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -115,7 +211,42 @@ class QuestionController extends Controller
             ->orderBy('order_no')
             ->get();
         $questionTypes = QuestionType::all();
-        return view('questions.edit', compact('question', 'items', 'questionTypes'));
+        $countries = Country::orderBy('name')->get();
+        
+        // Load relationships
+        $question->load(['options' => function ($query) {
+            $query->orderBy('order_no');
+        }, 'equation.factors' => function ($query) {
+            $query->orderBy('sn');
+        }]);
+        
+        // Prepare data for Alpine.js
+        $existingOptions = $question->options->count() > 0 
+            ? $question->options->map(function($opt) {
+                return [
+                    'option_text' => $opt->option_text,
+                    'option_value' => $opt->option_value,
+                    'order_no' => $opt->order_no
+                ];
+            })->toArray()
+            : [['option_text' => '', 'option_value' => '', 'order_no' => 1]];
+            
+        $existingFactors = $question->equation && $question->equation->factors->count() > 0 
+            ? $question->equation->factors->map(function($fac) {
+                return [
+                    'sn' => $fac->sn,
+                    'operation' => $fac->operation,
+                    'factor_value' => $fac->factor_value,
+                    'country_id' => $fac->country_id
+                ];
+            })->toArray()
+            : [['sn' => 1, 'operation' => 'multiply', 'factor_value' => '', 'country_id' => '']];
+        
+        $optionsJson = json_encode($existingOptions);
+        $factorsJson = json_encode($existingFactors);
+        $equationName = $question->equation->name ?? '';
+
+        return view('questions.edit', compact('question', 'items', 'questionTypes', 'countries', 'optionsJson', 'factorsJson', 'equationName'));
     }
 
     /**
@@ -123,19 +254,132 @@ class QuestionController extends Controller
      */
     public function update(Request $request, Question $question)
     {
-        $validated = $request->validate([
+        // Base validation rules
+        $rules = [
             'item_id' => 'required|exists:items,id',
             'question_text' => 'required|string',
             'question_type_id' => 'required|exists:question_types,id',
             'unit' => 'nullable|string|max:255',
             'is_required' => 'boolean',
             'is_active' => 'boolean',
-        ]);
+        ];
 
-        $question->update($validated);
+        // Add conditional validation based on question type
+        if ($request->question_type_id == 1) {
+            // Numeric type - validate equation and factors
+            $rules['equation_name'] = 'nullable|string|max:255';
+            $rules['factors'] = 'nullable|array';
+            $rules['factors.*.sn'] = 'nullable|integer|min:1';
+            $rules['factors.*.operation'] = 'nullable|string|in:multiply,add,subtract,divide';
+            $rules['factors.*.factor_value'] = 'nullable|numeric';
+            $rules['factors.*.country_id'] = 'nullable|exists:countries,id';
+        } elseif ($request->question_type_id == 2) {
+            // MCQ type - validate options
+            $rules['options'] = 'nullable|array';
+            $rules['options.*.option_text'] = 'nullable|string|max:255';
+            $rules['options.*.option_value'] = 'nullable|numeric';
+            $rules['options.*.order_no'] = 'nullable|integer|min:1';
+        }
 
-        return redirect()->route('questions.index')
-            ->with('success', 'Question updated successfully.');
+        $validated = $request->validate($rules);
+
+        DB::beginTransaction();
+        try {
+            // Update question
+            $question->update([
+                'item_id' => $validated['item_id'],
+                'question_text' => $validated['question_text'],
+                'question_type_id' => $validated['question_type_id'],
+                'unit' => $validated['unit'] ?? null,
+                'is_required' => $request->has('is_required'),
+                'is_active' => $request->has('is_active'),
+            ]);
+
+            // If type changed or type is numeric
+            if ($validated['question_type_id'] == 1) {
+                // Delete old options if type changed to numeric
+                $question->options()->delete();
+                
+                $hasFactors = !empty($validated['factors']) && collect($validated['factors'])->filter(function($factor) {
+                    return !empty($factor['factor_value']);
+                })->count() > 0;
+                
+                // Handle equation and factors
+                if ($hasFactors || !empty($validated['equation_name'])) {
+                    // Delete old equation and its factors
+                    if ($question->equation) {
+                        $question->equation->factors()->delete();
+                        $question->equation->delete();
+                    }
+                    
+                    // Create new equation
+                    $equation = Equation::create([
+                        'question_id' => $question->id,
+                        'name' => $validated['equation_name'] ?? 'Equation',
+                    ]);
+
+                    // Create factors
+                    if ($hasFactors) {
+                        foreach ($validated['factors'] as $factorData) {
+                            if (!empty($factorData['factor_value'])) {
+                                Factor::create([
+                                    'equation_id' => $equation->id,
+                                    'sn' => $factorData['sn'],
+                                    'operation' => $factorData['operation'],
+                                    'factor_value' => $factorData['factor_value'],
+                                    'country_id' => $factorData['country_id'] ?? null,
+                                ]);
+                            }
+                        }
+                    }
+                } else {
+                    // Remove equation if no name or factors provided
+                    if ($question->equation) {
+                        $question->equation->factors()->delete();
+                        $question->equation->delete();
+                    }
+                }
+            }
+
+            // If type is MCQ
+            if ($validated['question_type_id'] == 2) {
+                // Delete old equation and factors if type changed to MCQ
+                if ($question->equation) {
+                    $question->equation->factors()->delete();
+                    $question->equation->delete();
+                }
+                
+                // Delete old options
+                $question->options()->delete();
+                
+                $hasOptions = !empty($validated['options']) && collect($validated['options'])->filter(function($option) {
+                    return !empty($option['option_text']);
+                })->count() > 0;
+                
+                // Create new options
+                if ($hasOptions) {
+                    foreach ($validated['options'] as $optionData) {
+                        if (!empty($optionData['option_text'])) {
+                            Option::create([
+                                'question_id' => $question->id,
+                                'option_text' => $optionData['option_text'],
+                                'option_value' => $optionData['option_value'] ?? null,
+                                'order_no' => $optionData['order_no'],
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            DB::commit();
+            return redirect()->route('questions.index')
+                ->with('success', 'Question updated successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Failed to update question: ' . $e->getMessage());
+        }
     }
 
     /**

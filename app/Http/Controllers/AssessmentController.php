@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Answer;
 use App\Models\Assessment;
 use App\Models\Factory;
+use App\Models\Question;
+use App\Models\Section;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AssessmentController extends Controller
 {
@@ -92,6 +96,34 @@ class AssessmentController extends Controller
     }
 
     /**
+     * Display the specified resource.
+     */
+    public function show(Assessment $assessment)
+    {
+        // Load assessment with all necessary relationships
+        $assessment->load([
+            'factory.factoryType',
+            'factory.country',
+            'answers.question.item.subsection.section',
+            'answers.question.questionType',
+            'answers.option'
+        ]);
+
+        // Get all sections with their hierarchy for this assessment
+        $sections = Section::with([
+            'subsections.items.questions' => function($query) {
+                $query->where('is_active', true)
+                      ->with('questionType', 'options');
+            }
+        ])->get();
+
+        // Get existing answers for this assessment
+        $existingAnswers = $assessment->answers->keyBy('question_id');
+
+        return view('assessments.show', compact('assessment', 'sections', 'existingAnswers'));
+    }
+
+    /**
      * Show the form for editing the specified resource.
      */
     public function edit(Assessment $assessment)
@@ -150,5 +182,131 @@ class AssessmentController extends Controller
 
         return redirect()->route('assessments.index')
             ->with('success', count($ids) . ' assessment(s) deleted successfully.');
+    }
+
+    /**
+     * Show the perform assessment page.
+     */
+    public function perform(Assessment $assessment)
+    {
+        // Load assessment with necessary relationships
+        $assessment->load([
+            'factory.country',
+            'answers.question',
+            'answers.option'
+        ]);
+
+        // Get all sections with active questions
+        $sections = Section::with([
+            'subsections.items.questions' => function($query) {
+                $query->where('is_active', true)
+                      ->with(['questionType', 'options' => function($q) {
+                          $q->orderBy('order_no');
+                      }, 'equation.factors' => function($q) {
+                          $q->orderBy('sn');
+                      }]);
+            }
+        ])->where('is_active', true)
+          ->orderBy('order_no')
+          ->get();
+
+        // Get existing answers keyed by question_id
+        $existingAnswers = $assessment->answers->keyBy('question_id');
+
+        return view('assessments.perform', compact('assessment', 'sections', 'existingAnswers'));
+    }
+
+    /**
+     * Store answers for the assessment.
+     */
+    public function storeAnswers(Request $request, Assessment $assessment)
+    {
+        $validated = $request->validate([
+            'answers' => 'required|array',
+            'answers.*.question_id' => 'required|exists:questions,id',
+            'answers.*.item_id' => 'required|exists:items,id',
+            'answers.*.value' => 'nullable',
+            'answers.*.option_id' => 'nullable|exists:options,id',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            foreach ($validated['answers'] as $answerData) {
+                if (empty($answerData['value']) && empty($answerData['option_id'])) {
+                    continue; // Skip empty answers
+                }
+
+                // Get the question to determine type
+                $question = Question::with(['questionType', 'equation.factors'])
+                    ->findOrFail($answerData['question_id']);
+
+                $dataToSave = [
+                    'assessment_id' => $assessment->id,
+                    'question_id' => $answerData['question_id'],
+                    'item_id' => $answerData['item_id'],
+                ];
+
+                // Handle based on question type
+                if ($question->question_type_id == 1) {
+                    // Numeric type - perform calculation if factors exist
+                    $inputValue = floatval($answerData['value'] ?? 0);
+                    
+                    if ($question->equation && $question->equation->factors->count() > 0) {
+                        $result = $inputValue;
+                        
+                        // Apply factors sequentially
+                        foreach ($question->equation->factors as $factor) {
+                            switch ($factor->operation) {
+                                case 'multiply':
+                                    $result *= floatval($factor->factor_value);
+                                    break;
+                                case 'add':
+                                    $result += floatval($factor->factor_value);
+                                    break;
+                                case 'subtract':
+                                    $result -= floatval($factor->factor_value);
+                                    break;
+                                case 'divide':
+                                    if (floatval($factor->factor_value) != 0) {
+                                        $result /= floatval($factor->factor_value);
+                                    }
+                                    break;
+                            }
+                        }
+                        
+                        $dataToSave['numeric_value'] = $result;
+                    } else {
+                        // No factors, just store the input value
+                        $dataToSave['numeric_value'] = $inputValue;
+                    }
+                    
+                    $dataToSave['option_id'] = null;
+                    $dataToSave['text_value'] = null;
+                } elseif ($question->question_type_id == 2) {
+                    // MCQ type - store option_id
+                    $dataToSave['option_id'] = $answerData['option_id'] ?? null;
+                    $dataToSave['numeric_value'] = null;
+                    $dataToSave['text_value'] = null;
+                }
+
+                // Update or create answer
+                Answer::updateOrCreate(
+                    [
+                        'assessment_id' => $assessment->id,
+                        'question_id' => $answerData['question_id'],
+                    ],
+                    $dataToSave
+                );
+            }
+
+            DB::commit();
+            return redirect()->route('assessments.show', $assessment)
+                ->with('success', 'Assessment answers saved successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Failed to save answers: ' . $e->getMessage());
+        }
     }
 }
