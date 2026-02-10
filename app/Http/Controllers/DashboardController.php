@@ -23,19 +23,20 @@ class DashboardController extends Controller
         // Get factories connected to the user
         $userFactoryIds = $user->factories()->pluck('factories.id');
         
-        // Get filter values
-        $selectedYear = $request->get('year', date('Y'));
+        // Get filter values (default to null to show all data)
+        $selectedYear = $request->get('year');
         $selectedFactoryId = $request->get('factory_id');
         
         // Get assessments for user's factories with filters
         $assessmentsQuery = Assessment::whereIn('factory_id', $userFactoryIds)
             ->where('status', 'approved');
         
-        if ($selectedYear) {
+        // Only apply filters if values are provided and not empty
+        if ($selectedYear && $selectedYear !== '') {
             $assessmentsQuery->where('year', $selectedYear);
         }
         
-        if ($selectedFactoryId) {
+        if ($selectedFactoryId && $selectedFactoryId !== '') {
             $assessmentsQuery->where('factory_id', $selectedFactoryId);
         }
         
@@ -108,8 +109,8 @@ class DashboardController extends Controller
         $user = auth()->user();
         $userFactoryIds = $user->factories()->pluck('factories.id');
         
-        // Get filter values
-        $selectedYear = $request->get('year', date('Y'));
+        // Get filter values (default to null to show all data)
+        $selectedYear = $request->get('year');
         $selectedFactoryId = $request->get('factory_id');
         
         // Get assessments for user's factories with filters
@@ -117,11 +118,12 @@ class DashboardController extends Controller
             ->where('status', 'approved')
             ->with('factory');
         
-        if ($selectedYear) {
+        // Only apply filters if values are provided and not empty
+        if ($selectedYear && $selectedYear !== '') {
             $assessmentsQuery->where('year', $selectedYear);
         }
         
-        if ($selectedFactoryId) {
+        if ($selectedFactoryId && $selectedFactoryId !== '') {
             $assessmentsQuery->where('factory_id', $selectedFactoryId);
         }
         
