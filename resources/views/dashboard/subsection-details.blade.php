@@ -63,42 +63,46 @@
                 </form>
             </div>
         </div>
-        @forelse($visualizationData as $index => $data)
+        @forelse($visualizationData as $index => $itemData)
             <div class="dashboard-card mb-6">
                 <div class="p-6">
-                    <!-- Question Header -->
+                    <!-- Item Header -->
                     <div class="flex items-start justify-between mb-6 pb-4 border-b-2 border-neutral-200">
                         <div class="flex-1">
                             <h3 class="text-xl font-bold text-neutral-900 mb-2">
-                                {{ $data['question']->question_text }}
+                                {{ $itemData['item']->name }}
                             </h3>
-                            <div class="flex items-center gap-3 text-sm text-neutral-600">
+                            @if($itemData['item']->unit)
                                 <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-primary-100 text-primary-800">
-                                    {{ $data['item']->name }}
+                                    Unit: {{ $itemData['item']->unit }}
                                 </span>
-                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-neutral-100 text-neutral-800">
-                                    {{ $data['question']->questionType->name }}
-                                </span>
-                                @if($data['question']->unit)
-                                    <span class="text-neutral-700 font-semibold">Unit: {{ $data['question']->unit }}</span>
-                                @endif
-                            </div>
+                            @endif
                         </div>
                     </div>
 
-                    @if($data['type'] == 1)
-                        <!-- Numeric Question Visualization -->
-                        @if(isset($data['chart_data']) && $data['chart_data']->count() > 0)
-                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                            <!-- Summary Cards -->
-                            <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 border-2 border-blue-200 shadow-md">
+                    @if(count($itemData['numeric_questions']) > 0)
+                        <!-- Numeric Questions Visualization -->
+                        <div class="mb-8">
+                            <h4 class="text-lg font-bold text-neutral-800 mb-4 flex items-center">
+                                <svg class="w-5 h-5 mr-2 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                </svg>
+                                Numeric Questions Distribution
+                            </h4>
+                            
+                            @php
+                                $totalNumeric = collect($itemData['numeric_questions'])->sum('total');
+                            @endphp
+                            
+                            <!-- Summary Card -->
+                            <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 border-2 border-blue-200 shadow-md mb-6">
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <p class="text-sm font-bold text-blue-700 mb-1 uppercase">Total Value</p>
                                         <p class="text-3xl font-extrabold text-blue-900">
-                                            {{ number_format($data['total'] ?? 0, 2) }}
-                                            @if($data['question']->unit)
-                                                <span class="text-base font-bold text-blue-700">{{ $data['question']->unit }}</span>
+                                            {{ number_format($totalNumeric, 2) }}
+                                            @if($itemData['item']->unit)
+                                                <span class="text-base font-bold text-blue-700">{{ $itemData['item']->unit }}</span>
                                             @endif
                                         </p>
                                     </div>
@@ -109,106 +113,114 @@
                                     </div>
                                 </div>
                             </div>
-
-                            <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-5 border-2 border-green-200 shadow-md">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="text-sm font-bold text-green-700 mb-1 uppercase">Average</p>
-                                        <p class="text-3xl font-extrabold text-green-900">
-                                            {{ number_format($data['average'] ?? 0, 2) }}
-                                            @if($data['question']->unit)
-                                                <span class="text-base font-bold text-green-700">{{ $data['question']->unit }}</span>
-                                            @endif
-                                        </p>
-                                    </div>
-                                    <div class="w-14 h-14 bg-green-600 rounded-xl flex items-center justify-center shadow-lg">
-                                        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
-                                        </svg>
+                            
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <!-- Pie Chart -->
+                                <div class="bg-neutral-50 rounded-xl p-5 border-2 border-neutral-200 shadow-sm">
+                                    <h5 class="text-base font-bold text-neutral-800 mb-4">Value Distribution by Question</h5>
+                                    <div style="position: relative; height: 300px;">
+                                        <canvas id="numericPieChart{{ $index }}"></canvas>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-5 border-2 border-purple-200 shadow-md">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="text-sm font-bold text-purple-700 mb-1 uppercase">Data Points</p>
-                                        <p class="text-3xl font-extrabold text-purple-900">
-                                            {{ $data['chart_data']->count() }}
-                                            <span class="text-base font-bold text-purple-700">{{ $data['chart_data']->count() == 1 ? 'factory' : 'factories' }}</span>
-                                        </p>
-                                    </div>
-                                    <div class="w-14 h-14 bg-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                                        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                                        </svg>
+                                <!-- Data Table -->
+                                <div class="bg-neutral-50 rounded-xl p-5 border-2 border-neutral-200 shadow-sm">
+                                    <h5 class="text-base font-bold text-neutral-800 mb-4">Value Breakdown</h5>
+                                    <div class="space-y-2 max-h-[300px] overflow-y-auto">
+                                        @foreach($itemData['numeric_questions'] as $numQ)
+                                            @php
+                                                $percentage = $totalNumeric > 0 ? ($numQ['total'] / $totalNumeric * 100) : 0;
+                                            @endphp
+                                            <div class="p-3 bg-white rounded-lg border-2 border-neutral-200 shadow-sm">
+                                                <div class="flex items-start justify-between mb-2">
+                                                    <p class="text-sm font-semibold text-neutral-900 flex-1 pr-2">{{ $numQ['question']->question_text }}</p>
+                                                </div>
+                                                <div class="flex items-center justify-between">
+                                                    <span class="text-xs text-neutral-600">
+                                                        {{ number_format($numQ['total'], 2) }} {{ $itemData['item']->unit }}
+                                                    </span>
+                                                    <span class="px-2 py-1 bg-primary-100 text-primary-800 rounded-full text-xs font-bold">
+                                                        {{ number_format($percentage, 1) }}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        @endforeach
                                     </div>
                                 </div>
                             </div>
                         </div>
+                    @endif
 
-                        <!-- Charts -->
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <!-- Bar Chart -->
-                            <div class="bg-neutral-50 rounded-xl p-5 border-2 border-neutral-200 shadow-sm">
-                                <h4 class="text-base font-bold text-neutral-800 mb-4">Calculated Values by Factory</h4>
-                                <div style="position: relative; height: 300px;">
-                                    <canvas id="barChart{{ $index }}"></canvas>
-                                </div>
-                            </div>
-
-                            <!-- Comparison Chart -->
-                            <div class="bg-neutral-50 rounded-xl p-5 border-2 border-neutral-200 shadow-sm">
-                                <h4 class="text-base font-bold text-neutral-800 mb-4">Actual vs Calculated Values</h4>
-                                <div style="position: relative; height: 300px;">
-                                    <canvas id="comparisonChart{{ $index }}"></canvas>
-                                </div>
-                            </div>
-                        </div>
-                        @else
-                        <div class="bg-neutral-50 rounded-xl p-10 text-center border-2 border-neutral-200">
-                            <svg class="w-16 h-16 mx-auto text-neutral-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                            </svg>
-                            <p class="text-neutral-700 font-bold text-base">No data available for this question</p>
-                        </div>
-                        @endif
-
-                    @elseif($data['type'] == 2)
-                        <!-- MCQ Question Visualization -->
-                        @if(isset($data['chart_data']) && $data['chart_data']->count() > 0)
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <!-- Pie Chart -->
-                            <div class="bg-neutral-50 rounded-xl p-5 border-2 border-neutral-200 shadow-sm">
-                                <h4 class="text-base font-bold text-neutral-800 mb-4">Response Distribution</h4>
-                                <div style="position: relative; height: 300px;">
-                                    <canvas id="pieChart{{ $index }}"></canvas>
-                                </div>
-                            </div>
-
-                            <!-- Data Table -->
-                            <div class="bg-neutral-50 rounded-xl p-5 border-2 border-neutral-200 shadow-sm">
-                                <h4 class="text-base font-bold text-neutral-800 mb-4">Response Summary</h4>
-                                <div class="space-y-2">
-                                    @foreach($data['chart_data'] as $optionData)
-                                        <div class="flex items-center justify-between p-3 bg-white rounded-lg border-2 border-neutral-200 shadow-sm">
-                                            <span class="text-sm font-bold text-neutral-900">{{ $optionData['option'] }}</span>
-                                            <span class="px-3 py-1.5 bg-primary-100 text-primary-800 rounded-full text-sm font-extrabold">
-                                                {{ $optionData['count'] }} {{ $optionData['count'] == 1 ? 'response' : 'responses' }}
-                                            </span>
+                    @if(count($itemData['mcq_questions']) > 0)
+                        <!-- MCQ Questions Visualization -->
+                        <div class="mb-8">
+                            <h4 class="text-lg font-bold text-neutral-800 mb-4 flex items-center">
+                                <svg class="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                                </svg>
+                                Multiple Choice Questions
+                            </h4>
+                            
+                            @foreach($itemData['mcq_questions'] as $mcqIndex => $mcqData)
+                                <div class="mb-6 bg-neutral-50 rounded-xl p-5 border-2 border-neutral-200">
+                                    <h5 class="text-base font-semibold text-neutral-800 mb-4">{{ $mcqData['question']->question_text }}</h5>
+                                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        <!-- Pie Chart -->
+                                        <div style="position: relative; height: 250px;">
+                                            <canvas id="mcqChart{{ $index }}_{{ $mcqIndex }}"></canvas>
                                         </div>
-                                    @endforeach
+                                        
+                                        <!-- Summary -->
+                                        <div class="space-y-2">
+                                            @foreach($mcqData['chart_data'] as $optionData)
+                                                <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-neutral-200">
+                                                    <span class="text-sm font-semibold text-neutral-800">{{ $optionData['option'] }}</span>
+                                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-bold">
+                                                        {{ $optionData['count'] }}
+                                                    </span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            @endforeach
                         </div>
-                        @else
-                        <div class="bg-neutral-50 rounded-xl p-10 text-center border-2 border-neutral-200">
-                            <svg class="w-16 h-16 mx-auto text-neutral-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                            </svg>
-                            <p class="text-neutral-700 font-bold text-base">No data available for this question</p>
+                    @endif
+
+                    @if(count($itemData['multiple_select_questions']) > 0)
+                        <!-- Multiple Select Questions Visualization -->
+                        <div class="mb-8">
+                            <h4 class="text-lg font-bold text-neutral-800 mb-4 flex items-center">
+                                <svg class="w-5 h-5 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                                </svg>
+                                Multiple Select Questions
+                            </h4>
+                            
+                            @foreach($itemData['multiple_select_questions'] as $msIndex => $msData)
+                                <div class="mb-6 bg-neutral-50 rounded-xl p-5 border-2 border-neutral-200">
+                                    <h5 class="text-base font-semibold text-neutral-800 mb-4">{{ $msData['question']->question_text }}</h5>
+                                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        <!-- Bar Chart -->
+                                        <div style="position: relative; height: 250px;">
+                                            <canvas id="msChart{{ $index }}_{{ $msIndex }}"></canvas>
+                                        </div>
+                                        
+                                        <!-- Summary -->
+                                        <div class="space-y-2">
+                                            @foreach($msData['chart_data'] as $optionData)
+                                                <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-neutral-200">
+                                                    <span class="text-sm font-semibold text-neutral-800">{{ $optionData['option'] }}</span>
+                                                    <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-bold">
+                                                        {{ $optionData['count'] }}
+                                                    </span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
                         </div>
-                        @endif
                     @endif
                 </div>
             </div>
@@ -239,161 +251,34 @@
                 red: 'rgb(239, 68, 68)',
                 yellow: 'rgb(234, 179, 8)',
                 pink: 'rgb(236, 72, 153)',
+                teal: 'rgb(20, 184, 166)',
+                indigo: 'rgb(99, 102, 241)',
             };
 
-            @foreach($visualizationData as $index => $data)
-                @if($data['type'] == 1 && isset($data['chart_data']))
-                    // Numeric Question Charts
+            const colorArray = [
+                colors.primary, colors.blue, colors.green, colors.purple,
+                colors.orange, colors.red, colors.yellow, colors.pink,
+                colors.teal, colors.indigo
+            ];
+
+            @foreach($visualizationData as $index => $itemData)
+                @if(count($itemData['numeric_questions']) > 0)
+                    // Numeric Questions Pie Chart
                     @php
-                        $factories = $data['chart_data']->pluck('factory')->toArray();
-                        $actualAnswers = $data['chart_data']->pluck('actual_answer')->toArray();
-                        $calculatedAnswers = $data['chart_data']->pluck('calculated_answer')->toArray();
+                        $labels = collect($itemData['numeric_questions'])->pluck('question.question_text')->toArray();
+                        $values = collect($itemData['numeric_questions'])->pluck('total')->toArray();
                     @endphp
                     
-                    console.log('Creating bar chart {{ $index }}');
-                    const barChartElement{{ $index }} = document.getElementById('barChart{{ $index }}');
-                    if (barChartElement{{ $index }}) {
-                        const barChart{{ $index }} = new Chart(barChartElement{{ $index }}, {
-                            type: 'bar',
-                            data: {
-                                labels: @json($factories),
-                                datasets: [{
-                                    label: 'Calculated Value ({{ $data['question']->unit ?? '' }})',
-                                    data: @json($calculatedAnswers),
-                                    backgroundColor: colors.primary,
-                                    borderColor: colors.primary,
-                                    borderWidth: 1,
-                                    borderRadius: 6,
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: { 
-                                        display: true,
-                                        position: 'top',
-                                    },
-                                    tooltip: {
-                                        backgroundColor: 'rgba(0,0,0,0.8)',
-                                        padding: 12,
-                                        cornerRadius: 8,
-                                        callbacks: {
-                                            label: function(context) {
-                                                return context.dataset.label + ': ' + context.parsed.y.toFixed(2);
-                                            }
-                                        }
-                                    }
-                                },
-                                scales: {
-                                    y: {
-                                        beginAtZero: true,
-                                        grid: { color: 'rgba(0,0,0,0.05)' },
-                                        ticks: {
-                                            callback: function(value) {
-                                                return value.toFixed(2);
-                                            }
-                                        }
-                                    },
-                                    x: {
-                                        grid: { display: false }
-                                    }
-                                }
-                            }
-                        });
-                        console.log('Bar chart {{ $index }} created successfully');
-                    } else {
-                        console.error('Bar chart element {{ $index }} not found');
-                    }
-
-                    console.log('Creating comparison chart {{ $index }}');
-                    const comparisonChartElement{{ $index }} = document.getElementById('comparisonChart{{ $index }}');
-                    if (comparisonChartElement{{ $index }}) {
-                        const comparisonChart{{ $index }} = new Chart(comparisonChartElement{{ $index }}, {
-                            type: 'bar',
-                            data: {
-                                labels: @json($factories),
-                                datasets: [
-                                    {
-                                        label: 'Actual Answer',
-                                        data: @json($actualAnswers),
-                                        backgroundColor: colors.blue,
-                                        borderRadius: 6,
-                                    },
-                                    {
-                                        label: 'Calculated Answer',
-                                        data: @json($calculatedAnswers),
-                                        backgroundColor: colors.green,
-                                        borderRadius: 6,
-                                    }
-                                ]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: {
-                                        display: true,
-                                        position: 'top',
-                                    },
-                                    tooltip: {
-                                        backgroundColor: 'rgba(0,0,0,0.8)',
-                                        padding: 12,
-                                        cornerRadius: 8,
-                                        callbacks: {
-                                            label: function(context) {
-                                                return context.dataset.label + ': ' + context.parsed.y.toFixed(2);
-                                            }
-                                        }
-                                    }
-                                },
-                                scales: {
-                                    y: {
-                                        beginAtZero: true,
-                                        grid: { color: 'rgba(0,0,0,0.05)' },
-                                        ticks: {
-                                            callback: function(value) {
-                                                return value.toFixed(2);
-                                            }
-                                        }
-                                    },
-                                    x: {
-                                        grid: { display: false }
-                                    }
-                                }
-                            }
-                        });
-                        console.log('Comparison chart {{ $index }} created successfully');
-                    } else {
-                        console.error('Comparison chart element {{ $index }} not found');
-                    }
-
-                @elseif($data['type'] == 2 && isset($data['chart_data']))
-                    // MCQ Question Chart
-                    @php
-                        $options = $data['chart_data']->pluck('option')->toArray();
-                        $counts = $data['chart_data']->pluck('count')->toArray();
-                    @endphp
-                    
-                    console.log('Creating pie chart {{ $index }}');
-                    const pieChartElement{{ $index }} = document.getElementById('pieChart{{ $index }}');
-                    if (pieChartElement{{ $index }}) {
-                        const pieChart{{ $index }} = new Chart(pieChartElement{{ $index }}, {
+                    console.log('Creating numeric pie chart {{ $index }}');
+                    const numericPieElement{{ $index }} = document.getElementById('numericPieChart{{ $index }}');
+                    if (numericPieElement{{ $index }}) {
+                        new Chart(numericPieElement{{ $index }}, {
                             type: 'doughnut',
                             data: {
-                                labels: @json($options),
+                                labels: @json($labels),
                                 datasets: [{
-                                    data: @json($counts),
-                                    backgroundColor: [
-                                        colors.primary,
-                                        colors.blue,
-                                        colors.green,
-                                        colors.purple,
-                                        colors.orange,
-                                        colors.red,
-                                        colors.yellow,
-                                        colors.pink,
-                                    ],
+                                    data: @json($values),
+                                    backgroundColor: colorArray,
                                     borderWidth: 2,
                                     borderColor: '#fff',
                                 }]
@@ -405,6 +290,64 @@
                                     legend: {
                                         display: true,
                                         position: 'bottom',
+                                        labels: {
+                                            padding: 10,
+                                            font: { size: 11 }
+                                        }
+                                    },
+                                    tooltip: {
+                                        backgroundColor: 'rgba(0,0,0,0.8)',
+                                        padding: 12,
+                                        cornerRadius: 8,
+                                        callbacks: {
+                                            label: function(context) {
+                                                const label = context.label || '';
+                                                const value = context.parsed || 0;
+                                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                                const percentage = ((value / total) * 100).toFixed(1);
+                                                return label.substring(0, 30) + '...: ' + value.toFixed(2) + ' (' + percentage + '%)';
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                        console.log('Numeric pie chart {{ $index }} created');
+                    }
+                @endif
+
+                @foreach($itemData['mcq_questions'] as $mcqIndex => $mcqData)
+                    // MCQ Pie Chart
+                    @php
+                        $mcqLabels = $mcqData['chart_data']->pluck('option')->toArray();
+                        $mcqCounts = $mcqData['chart_data']->pluck('count')->toArray();
+                    @endphp
+                    
+                    console.log('Creating MCQ chart {{ $index }}_{{ $mcqIndex }}');
+                    const mcqElement{{ $index }}_{{ $mcqIndex }} = document.getElementById('mcqChart{{ $index }}_{{ $mcqIndex }}');
+                    if (mcqElement{{ $index }}_{{ $mcqIndex }}) {
+                        new Chart(mcqElement{{ $index }}_{{ $mcqIndex }}, {
+                            type: 'doughnut',
+                            data: {
+                                labels: @json($mcqLabels),
+                                datasets: [{
+                                    data: @json($mcqCounts),
+                                    backgroundColor: colorArray,
+                                    borderWidth: 2,
+                                    borderColor: '#fff',
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        display: true,
+                                        position: 'bottom',
+                                        labels: {
+                                            padding: 8,
+                                            font: { size: 10 }
+                                        }
                                     },
                                     tooltip: {
                                         backgroundColor: 'rgba(0,0,0,0.8)',
@@ -423,11 +366,62 @@
                                 }
                             }
                         });
-                        console.log('Pie chart {{ $index }} created successfully');
-                    } else {
-                        console.error('Pie chart element {{ $index }} not found');
                     }
-                @endif
+                @endforeach
+
+                @foreach($itemData['multiple_select_questions'] as $msIndex => $msData)
+                    // Multiple Select Bar Chart
+                    @php
+                        $msLabels = $msData['chart_data']->pluck('option')->toArray();
+                        $msCounts = $msData['chart_data']->pluck('count')->toArray();
+                    @endphp
+                    
+                    console.log('Creating MS chart {{ $index }}_{{ $msIndex }}');
+                    const msElement{{ $index }}_{{ $msIndex }} = document.getElementById('msChart{{ $index }}_{{ $msIndex }}');
+                    if (msElement{{ $index }}_{{ $msIndex }}) {
+                        new Chart(msElement{{ $index }}_{{ $msIndex }}, {
+                            type: 'bar',
+                            data: {
+                                labels: @json($msLabels),
+                                datasets: [{
+                                    label: 'Selections',
+                                    data: @json($msCounts),
+                                    backgroundColor: colorArray,
+                                    borderRadius: 6,
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        display: false,
+                                    },
+                                    tooltip: {
+                                        backgroundColor: 'rgba(0,0,0,0.8)',
+                                        padding: 12,
+                                        cornerRadius: 8,
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        grid: { color: 'rgba(0,0,0,0.05)' },
+                                        ticks: {
+                                            stepSize: 1,
+                                            callback: function(value) {
+                                                return Number.isInteger(value) ? value : '';
+                                            }
+                                        }
+                                    },
+                                    x: {
+                                        grid: { display: false }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                @endforeach
             @endforeach
         });
     </script>

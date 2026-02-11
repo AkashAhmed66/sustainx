@@ -7,8 +7,10 @@ use App\Models\Assessment;
 use App\Models\Factory;
 use App\Models\Question;
 use App\Models\Section;
+use App\Models\SupportingDocument;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class AssessmentController extends Controller
 {
@@ -106,7 +108,8 @@ class AssessmentController extends Controller
             'factory.country',
             'answers.question.item.subsection.section',
             'answers.question.questionType',
-            'answers.option'
+            'answers.option',
+            'answers.supportingDocuments'
         ]);
 
         // Get all sections with their hierarchy for this assessment
@@ -193,7 +196,8 @@ class AssessmentController extends Controller
         $assessment->load([
             'factory.country',
             'answers.question',
-            'answers.option'
+            'answers.option',
+            'answers.supportingDocuments'
         ]);
 
         // Get all sections with active questions
@@ -227,14 +231,21 @@ class AssessmentController extends Controller
             'answers.*.item_id' => 'required|exists:items,id',
             'answers.*.value' => 'nullable',
             'answers.*.option_id' => 'nullable|exists:options,id',
+            'answers.*.option_ids' => 'nullable|array',
+            'answers.*.option_ids.*' => 'exists:options,id',
+            'answers.*.documents.*' => 'nullable|file|max:10240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', // 10MB max
             'submit_action' => 'nullable|in:save,submit',
         ]);
 
         DB::beginTransaction();
         try {
-            foreach ($validated['answers'] as $answerData) {
-                if (empty($answerData['value']) && empty($answerData['option_id'])) {
-                    continue; // Skip empty answers
+            foreach ($validated['answers'] as $answerIndex => $answerData) {
+                if (empty($answerData['value']) && empty($answerData['option_id']) && empty($answerData['option_ids'])) {
+                    // Still process if there are documents but no answer value
+                    $hasDocuments = $request->hasFile("answers.{$answerIndex}.documents");
+                    if (!$hasDocuments) {
+                        continue; // Skip if no answer and no documents
+                    }
                 }
 
                 // Get the question to determine type
@@ -287,22 +298,62 @@ class AssessmentController extends Controller
                     
                     $dataToSave['option_id'] = null;
                     $dataToSave['text_value'] = null;
+                    $dataToSave['selected_options'] = null;
                 } elseif ($question->question_type_id == 2) {
                     // MCQ type - store option_id
                     $dataToSave['option_id'] = $answerData['option_id'] ?? null;
                     $dataToSave['numeric_value'] = null;
                     $dataToSave['actual_answer'] = null;
                     $dataToSave['text_value'] = null;
+                    $dataToSave['selected_options'] = null;
+                } elseif ($question->question_type_id == 3) {
+                    // Multiple Select type - store array of option_ids
+                    $dataToSave['selected_options'] = $answerData['option_ids'] ?? [];
+                    $dataToSave['option_id'] = null;
+                    $dataToSave['numeric_value'] = null;
+                    $dataToSave['actual_answer'] = null;
+                    $dataToSave['text_value'] = null;
                 }
 
                 // Update or create answer
-                Answer::updateOrCreate(
+                $answer = Answer::updateOrCreate(
                     [
                         'assessment_id' => $assessment->id,
                         'question_id' => $answerData['question_id'],
                     ],
                     $dataToSave
                 );
+
+                // Handle file uploads for this question
+                if ($request->hasFile("answers.{$answerIndex}.documents")) {
+                    $files = $request->file("answers.{$answerIndex}.documents");
+                    
+                    foreach ($files as $file) {
+                        // Generate unique filename
+                        $originalName = $file->getClientOriginalName();
+                        $fileName = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                        
+                        // Store file in storage/app/supporting_documents/{assessment_id}/{question_id}
+                        $filePath = $file->storeAs(
+                            "supporting_documents/{$assessment->id}/{$question->id}",
+                            $fileName,
+                            'public'
+                        );
+
+                        // Create document record
+                        SupportingDocument::create([
+                            'assessment_id' => $assessment->id,
+                            'question_id' => $question->id,
+                            'answer_id' => $answer->id,
+                            'file_name' => $fileName,
+                            'file_path' => $filePath,
+                            'original_name' => $originalName,
+                            'file_size' => $file->getSize(),
+                            'mime_type' => $file->getMimeType(),
+                            'uploaded_by' => auth()->id(),
+                        ]);
+                    }
+                }
             }
 
             // Check if submitting for review

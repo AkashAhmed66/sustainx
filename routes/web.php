@@ -24,6 +24,10 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
+Route::get('/dashboard/comparison', [DashboardController::class, 'comparison'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard.comparison');
+
 Route::get('/dashboard/subsection/{subsection}', [DashboardController::class, 'subsectionDetails'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard.subsection');
@@ -112,6 +116,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:edit subsections')->group(function () {
         Route::get('/subsections/{subsection}/edit', [SubsectionController::class, 'edit'])->name('subsections.edit');
         Route::put('/subsections/{subsection}', [SubsectionController::class, 'update'])->name('subsections.update');
+        Route::delete('/subsection-images/{image}', [SubsectionController::class, 'deleteImage'])->name('subsection-images.delete');
     });
     Route::middleware('permission:delete subsections')->group(function () {
         Route::delete('/subsections/{subsection}', [SubsectionController::class, 'destroy'])->name('subsections.destroy');

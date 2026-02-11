@@ -46,14 +46,19 @@ class DashboardController extends Controller
         $sections = Section::with(['subsections' => function($q) use ($assessmentIds) {
             $q->where('is_active', true)
               ->orderBy('order_no')
-              ->with(['items' => function($iq) use ($assessmentIds) {
-                  $iq->where('is_active', true)
-                     ->orderBy('order_no')
-                     ->with(['questions' => function($qq) {
-                         $qq->where('is_active', true)
-                            ->where('question_type_id', 1); // Only numeric questions
-                     }]);
-              }]);
+              ->with([
+                  'images' => function($imgQuery) {
+                      $imgQuery->orderBy('order_no');
+                  },
+                  'items' => function($iq) use ($assessmentIds) {
+                      $iq->where('is_active', true)
+                         ->orderBy('order_no')
+                         ->with(['questions' => function($qq) {
+                             $qq->where('is_active', true)
+                                ->where('question_type_id', 1); // Only numeric questions
+                         }]);
+                  }
+              ]);
         }])->where('is_active', true)
           ->orderBy('order_no')
           ->get();
@@ -73,9 +78,9 @@ class DashboardController extends Controller
                     
                     $subsection->cumulative_total = $total;
                     
-                    // Get unit from first question if available
+                    // Get output unit from first question if available
                     $firstQuestion = $firstItem->questions->first();
-                    $subsection->unit = $firstQuestion ? $firstQuestion->unit : '';
+                    $subsection->unit = $firstQuestion ? $firstQuestion->output_unit : '';
                 } else {
                     $subsection->cumulative_total = 0;
                     $subsection->unit = '';
@@ -98,6 +103,111 @@ class DashboardController extends Controller
             'selectedYear',
             'factories',
             'selectedFactoryId'
+        ));
+    }
+    
+    /**
+     * Display comparison dashboard with year-over-year data.
+     */
+    public function comparison(Request $request)
+    {
+        $user = auth()->user();
+        $userFactoryIds = $user->factories()->pluck('factories.id');
+        
+        // Get available years
+        $availableYears = Assessment::whereIn('factory_id', $userFactoryIds)
+            ->distinct()
+            ->orderBy('year', 'desc')
+            ->pluck('year');
+        
+        // Get selected years from request (default to last 3 years if available)
+        $selectedYears = $request->get('years', []);
+        if (empty($selectedYears) && $availableYears->count() > 0) {
+            $selectedYears = $availableYears->take(3)->toArray();
+        }
+        
+        // Get selected subsection ID from request
+        $selectedSubsectionId = $request->get('subsection_id');
+        
+        // Get sections with subsections
+        $sections = Section::with(['subsections' => function($q) {
+            $q->where('is_active', true)
+              ->orderBy('order_no')
+              ->with(['images' => function($imgQuery) {
+                  $imgQuery->orderBy('order_no');
+              }]);
+        }])->where('is_active', true)
+          ->orderBy('order_no')
+          ->get();
+        
+        // Prepare comparison data for selected subsection
+        $comparisonData = null;
+        $selectedSubsection = null;
+        $unit = '';
+        
+        if ($selectedSubsectionId) {
+            $selectedSubsection = Subsection::with([
+                'images' => function($imgQuery) {
+                    $imgQuery->orderBy('order_no');
+                },
+                'items' => function($q) {
+                    $q->where('is_active', true)
+                      ->orderBy('order_no')
+                      ->with(['questions' => function($qq) {
+                          $qq->where('is_active', true)
+                             ->where('question_type_id', 1); // Only numeric questions
+                      }]);
+                }
+            ])->find($selectedSubsectionId);
+            
+            if ($selectedSubsection) {
+                $firstItem = $selectedSubsection->items->first();
+                
+                if ($firstItem && $firstItem->questions->count() > 0) {
+                    $questionIds = $firstItem->questions->pluck('id');
+                    $comparisonData = [];
+                    
+                    foreach ($selectedYears as $year) {
+                        $assessmentIds = Assessment::whereIn('factory_id', $userFactoryIds)
+                            ->where('status', 'approved')
+                            ->where('year', $year)
+                            ->pluck('id');
+                        
+                        $total = Answer::whereIn('assessment_id', $assessmentIds)
+                            ->whereIn('question_id', $questionIds)
+                            ->sum('numeric_value');
+                        
+                        $count = Answer::whereIn('assessment_id', $assessmentIds)
+                            ->whereIn('question_id', $questionIds)
+                            ->count();
+                        
+                        $comparisonData[] = [
+                            'year' => $year,
+                            'total' => $total,
+                            'count' => $count,
+                        ];
+                    }
+                    
+                    // Get unit from first question
+                    $firstQuestion = $firstItem->questions->first();
+                    $unit = $firstQuestion ? $firstQuestion->output_unit : '';
+                } else {
+                    $unit = '';
+                }
+            }
+        }
+        
+        // Get user's factories for potential future filtering
+        $factories = $user->factories;
+        
+        return view('dashboard.comparison', compact(
+            'sections',
+            'availableYears',
+            'selectedYears',
+            'selectedSubsection',
+            'comparisonData',
+            'unit',
+            'factories'
         ));
     }
     
@@ -130,65 +240,114 @@ class DashboardController extends Controller
         $assessments = $assessmentsQuery->get();
         $assessmentIds = $assessments->pluck('id');
         
-        // Load subsection with section, items and questions
-        $subsection->load(['section', 'items' => function($q) {
-            $q->where('is_active', true)
-              ->orderBy('order_no')
-              ->with(['questions' => function($qq) {
-                  $qq->where('is_active', true)
-                     ->with(['questionType', 'options']);
-              }]);
-        }]);
+        // Load subsection with section, items, questions and images
+        $subsection->load([
+            'section',
+            'images' => function($imgQuery) {
+                $imgQuery->orderBy('order_no');
+            },
+            'items' => function($q) {
+                $q->where('is_active', true)
+                  ->orderBy('order_no')
+                  ->with(['questions' => function($qq) {
+                      $qq->where('is_active', true)
+                         ->with(['questionType', 'options']);
+                  }]);
+            }
+        ]);
         
-        // Prepare data for visualizations
+        // Prepare data for visualizations - grouped by item
         $visualizationData = [];
         
         foreach ($subsection->items as $item) {
+            $itemData = [
+                'item' => $item,
+                'numeric_questions' => [],
+                'mcq_questions' => [],
+                'multiple_select_questions' => [],
+            ];
+            
+            // Group questions by type
             foreach ($item->questions as $question) {
-                $questionData = [
-                    'question' => $question,
-                    'item' => $item,
-                    'type' => $question->question_type_id,
-                ];
-                
                 if ($question->question_type_id == 1) {
-                    // Numeric question - get data for line/bar chart
+                    // Numeric question
                     $answers = Answer::whereIn('assessment_id', $assessmentIds)
                         ->where('question_id', $question->id)
                         ->with('assessment.factory')
                         ->get();
                     
-                    $chartData = $answers->map(function($answer) {
-                        return [
-                            'factory' => $answer->assessment->factory->name,
-                            'actual_answer' => (float) $answer->actual_answer,
-                            'calculated_answer' => (float) $answer->numeric_value,
-                            'year' => $answer->assessment->year,
+                    if ($answers->count() > 0) {
+                        $total = $answers->sum('numeric_value');
+                        $itemData['numeric_questions'][] = [
+                            'question' => $question,
+                            'total' => $total,
+                            'average' => $answers->avg('numeric_value'),
+                            'count' => $answers->count(),
                         ];
-                    });
-                    
-                    $questionData['chart_data'] = $chartData;
-                    $questionData['total'] = $answers->sum('numeric_value');
-                    $questionData['average'] = $answers->count() > 0 ? $answers->avg('numeric_value') : 0;
+                    }
                     
                 } elseif ($question->question_type_id == 2) {
-                    // MCQ question - get data for pie/donut chart
+                    // MCQ question
                     $answers = Answer::whereIn('assessment_id', $assessmentIds)
                         ->where('question_id', $question->id)
                         ->with(['option', 'assessment.factory'])
                         ->get();
                     
-                    $optionCounts = $answers->groupBy('option_id')->map(function($group) {
-                        return [
-                            'option' => $group->first()->option->option_text ?? 'N/A',
-                            'count' => $group->count(),
+                    if ($answers->count() > 0) {
+                        $optionCounts = $answers->groupBy('option_id')->map(function($group) {
+                            return [
+                                'option' => $group->first()->option->option_text ?? 'N/A',
+                                'count' => $group->count(),
+                            ];
+                        })->values();
+                        
+                        $itemData['mcq_questions'][] = [
+                            'question' => $question,
+                            'chart_data' => $optionCounts,
                         ];
-                    })->values();
+                    }
                     
-                    $questionData['chart_data'] = $optionCounts;
+                } elseif ($question->question_type_id == 3) {
+                    // Multiple Select question
+                    $answers = Answer::whereIn('assessment_id', $assessmentIds)
+                        ->where('question_id', $question->id)
+                        ->whereNotNull('selected_options')
+                        ->with('assessment.factory')
+                        ->get();
+                    
+                    if ($answers->count() > 0) {
+                        // Flatten all selected options and count occurrences
+                        $allSelectedOptions = [];
+                        foreach ($answers as $answer) {
+                            if (is_array($answer->selected_options)) {
+                                $allSelectedOptions = array_merge($allSelectedOptions, $answer->selected_options);
+                            }
+                        }
+                        
+                        $optionCounts = collect($allSelectedOptions)
+                            ->countBy()
+                            ->map(function($count, $optionId) use ($question) {
+                                $option = $question->options->firstWhere('id', $optionId);
+                                return [
+                                    'option' => $option ? $option->option_text : 'N/A',
+                                    'count' => $count,
+                                ];
+                            })
+                            ->values();
+                        
+                        $itemData['multiple_select_questions'][] = [
+                            'question' => $question,
+                            'chart_data' => $optionCounts,
+                        ];
+                    }
                 }
-                
-                $visualizationData[] = $questionData;
+            }
+            
+            // Only add items that have data
+            if (count($itemData['numeric_questions']) > 0 || 
+                count($itemData['mcq_questions']) > 0 || 
+                count($itemData['multiple_select_questions']) > 0) {
+                $visualizationData[] = $itemData;
             }
         }
         
