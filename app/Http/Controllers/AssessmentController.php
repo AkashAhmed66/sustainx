@@ -8,9 +8,14 @@ use App\Models\Factory;
 use App\Models\Question;
 use App\Models\Section;
 use App\Models\SupportingDocument;
+use App\Models\User;
+use App\Notifications\AssessmentSubmittedNotification;
+use App\Notifications\AssessmentApprovedNotification;
+use App\Notifications\AssessmentRejectedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Notification;
 
 class AssessmentController extends Controller
 {
@@ -362,6 +367,11 @@ class AssessmentController extends Controller
                     'status' => 'in_review',
                     'submitted_at' => now(),
                 ]);
+                
+                // Notify all admins and managers about the submission
+                $adminsAndManagers = User::role(['admin', 'manager'])->get();
+                Notification::send($adminsAndManagers, new AssessmentSubmittedNotification($assessment, auth()->user()));
+                
                 DB::commit();
                 return redirect()->route('assessments.show', $assessment)
                     ->with('success', 'Assessment submitted for review successfully.');
@@ -391,6 +401,10 @@ class AssessmentController extends Controller
         $assessment->update([
             'status' => 'approved',
         ]);
+        
+        // Notify all users connected to the factory
+        $factoryUsers = $assessment->factory->users;
+        Notification::send($factoryUsers, new AssessmentApprovedNotification($assessment));
 
         return redirect()->route('assessments.show', $assessment)
             ->with('success', 'Assessment approved successfully.');
@@ -409,6 +423,11 @@ class AssessmentController extends Controller
         $assessment->update([
             'status' => 'draft',
         ]);
+        
+        // Notify all users connected to the factory
+        $factoryUsers = $assessment->factory->users;
+        $rejectionReason = 'Please review and resubmit your assessment.';
+        Notification::send($factoryUsers, new AssessmentRejectedNotification($assessment, $rejectionReason));
 
         return redirect()->route('assessments.show', $assessment)
             ->with('success', 'Assessment rejected and returned to draft status.');
