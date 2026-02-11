@@ -41,9 +41,13 @@
                                 {{ ucfirst($item->questionType->name ?? '-') }}
                             </span>
                         </td>
-                    @elseif($key === 'unit')
+                    @elseif($key === 'input_unit')
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
-                            {{ $item->unit ?: '-' }}
+                            {{ $item->input_unit ?: '-' }}
+                        </td>
+                    @elseif($key === 'output_unit')
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
+                            {{ $item->output_unit ?: '-' }}
                         </td>
                     @elseif($key === 'is_required')
                         <td class="px-6 py-4 whitespace-nowrap">

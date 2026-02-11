@@ -106,18 +106,34 @@
                             @enderror
                         </div>
 
-                        <!-- Unit -->
+                        <!-- Input Unit -->
                         <div>
-                            <label for="unit" class="block text-sm font-medium text-neutral-700 mb-2">
-                                Unit <span class="text-neutral-500 text-xs">(e.g., MWh, %, kg, tonnes)</span>
+                            <label for="input_unit" class="block text-sm font-medium text-neutral-700 mb-2">
+                                Input Unit <span class="text-neutral-500 text-xs">(Unit shown during data entry - e.g., MWh, %, kg)</span>
                             </label>
                             <input type="text"
-                                   name="unit"
-                                   id="unit"
-                                   value="{{ old('unit') }}"
-                                   class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('unit') border-red-500 @enderror"
+                                   name="input_unit"
+                                   id="input_unit"
+                                   value="{{ old('input_unit') }}"
+                                   class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('input_unit') border-red-500 @enderror"
                                    placeholder="Optional">
-                            @error('unit')
+                            @error('input_unit')
+                                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <!-- Output Unit -->
+                        <div>
+                            <label for="output_unit" class="block text-sm font-medium text-neutral-700 mb-2">
+                                Output Unit <span class="text-neutral-500 text-xs">(Unit shown in reports/dashboard - e.g., tonnes, kg CO2e)</span>
+                            </label>
+                            <input type="text"
+                                   name="output_unit"
+                                   id="output_unit"
+                                   value="{{ old('output_unit') }}"
+                                   class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('output_unit') border-red-500 @enderror"
+                                   placeholder="Optional">
+                            @error('output_unit')
                                 <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
@@ -215,10 +231,12 @@
                             </div>
                         </div>
 
-                        <!-- Options Section (for MCQ type) -->
-                        <div x-show="questionType == '2'"
+                        <!-- Options Section (for MCQ and Multiple Select types) -->
+                        <div x-show="questionType == '2' || questionType == '3'"
                             <div class="border border-neutral-200 rounded-xl p-4 bg-neutral-50">
-                                <h3 class="font-medium text-neutral-800 mb-4">Multiple Choice Options</h3>
+                                <h3 class="font-medium text-neutral-800 mb-4">
+                                    <span x-text="questionType == '3' ? 'Multiple Select Options' : 'Multiple Choice Options'"></span>
+                                </h3>
                                 
                                 <template x-for="(option, index) in options" :key="index">
                                     <div class="grid grid-cols-12 gap-3 mb-3 items-start">

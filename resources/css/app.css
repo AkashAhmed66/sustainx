@@ -11,27 +11,27 @@
    CENTRAL THEME CONFIGURATION
    ======================================== */
 :root {
-    /* Primary Colors - Matte Greenish */
-    --color-primary: #3a9b6f;
-    --color-primary-light: #56b689;
-    --color-primary-dark: #2a7d59;
-    --color-primary-hover: #2a7d59;
+    /* Primary Colors - Bold Greenish */
+    --color-primary: #10b981;
+    --color-primary-light: #34d399;
+    --color-primary-dark: #059669;
+    --color-primary-hover: #047857;
 
     /* Background Colors */
-    --color-bg-main: #f8f9fa;
-    --color-bg-sidebar: #1e4f3b;
+    --color-bg-main: #f9fafb;
+    --color-bg-sidebar: #065f46;
     --color-bg-card: #ffffff;
-    --color-bg-hover: #f1f3f5;
+    --color-bg-hover: #f3f4f6;
 
     /* Text Colors */
-    --color-text-primary: #212529;
-    --color-text-secondary: #6c757d;
+    --color-text-primary: #111827;
+    --color-text-secondary: #4b5563;
     --color-text-light: #ffffff;
-    --color-text-muted: #adb5bd;
+    --color-text-muted: #9ca3af;
 
     /* Border Colors */
-    --color-border: #e9ecef;
-    --color-border-dark: #dee2e6;
+    --color-border: #e5e7eb;
+    --color-border-dark: #d1d5db;
 
     /* Sidebar Dimensions */
     --sidebar-width: 280px;
@@ -84,12 +84,12 @@
     }
 
     .sidebar-link {
-        @apply flex items-center gap-3 px-4 py-3 text-white/80 rounded-lg transition-all duration-200;
-        @apply hover:bg-primary-700 hover:text-white;
+        @apply flex items-center gap-3 px-4 py-3 text-white/90 rounded-lg transition-all duration-200;
+        @apply hover:bg-primary-700 hover:text-white font-semibold;
     }
 
     .sidebar-link.active {
-        @apply bg-primary-600 text-white shadow-sm;
+        @apply bg-primary-500 text-white shadow-lg font-bold;
     }
 
     .sidebar-link-icon {
@@ -159,25 +159,25 @@
 
     /* Card Styles */
     .dashboard-card {
-        @apply bg-white rounded-lg shadow-sm border p-6;
+        @apply bg-white rounded-xl shadow-md border-2 p-6;
         border-color: var(--color-border);
     }
 
     .card-title {
-        @apply text-lg font-semibold mb-4;
+        @apply text-xl font-bold mb-4;
         color: var(--color-text-primary);
     }
 
     /* Buttons */
     .btn-primary {
-        @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+        @apply px-5 py-2.5 rounded-lg font-bold transition-all duration-200 shadow-md;
         background-color: var(--color-primary);
         color: var(--color-text-light);
     }
 
     .btn-primary:hover {
         background-color: var(--color-primary-hover);
-        @apply shadow-md;
+        @apply shadow-lg transform scale-105;
     }
 
     .btn-secondary {

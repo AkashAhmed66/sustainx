@@ -7,8 +7,15 @@ use App\Models\Assessment;
 use App\Models\Factory;
 use App\Models\Question;
 use App\Models\Section;
+use App\Models\SupportingDocument;
+use App\Models\User;
+use App\Notifications\AssessmentSubmittedNotification;
+use App\Notifications\AssessmentApprovedNotification;
+use App\Notifications\AssessmentRejectedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Notification;
 
 class AssessmentController extends Controller
 {
@@ -106,7 +113,8 @@ class AssessmentController extends Controller
             'factory.country',
             'answers.question.item.subsection.section',
             'answers.question.questionType',
-            'answers.option'
+            'answers.option',
+            'answers.supportingDocuments'
         ]);
 
         // Get all sections with their hierarchy for this assessment
@@ -193,7 +201,8 @@ class AssessmentController extends Controller
         $assessment->load([
             'factory.country',
             'answers.question',
-            'answers.option'
+            'answers.option',
+            'answers.supportingDocuments'
         ]);
 
         // Get all sections with active questions
@@ -227,13 +236,21 @@ class AssessmentController extends Controller
             'answers.*.item_id' => 'required|exists:items,id',
             'answers.*.value' => 'nullable',
             'answers.*.option_id' => 'nullable|exists:options,id',
+            'answers.*.option_ids' => 'nullable|array',
+            'answers.*.option_ids.*' => 'exists:options,id',
+            'answers.*.documents.*' => 'nullable|file|max:10240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', // 10MB max
+            'submit_action' => 'nullable|in:save,submit',
         ]);
 
         DB::beginTransaction();
         try {
-            foreach ($validated['answers'] as $answerData) {
-                if (empty($answerData['value']) && empty($answerData['option_id'])) {
-                    continue; // Skip empty answers
+            foreach ($validated['answers'] as $answerIndex => $answerData) {
+                if (empty($answerData['value']) && empty($answerData['option_id']) && empty($answerData['option_ids'])) {
+                    // Still process if there are documents but no answer value
+                    $hasDocuments = $request->hasFile("answers.{$answerIndex}.documents");
+                    if (!$hasDocuments) {
+                        continue; // Skip if no answer and no documents
+                    }
                 }
 
                 // Get the question to determine type
@@ -251,10 +268,13 @@ class AssessmentController extends Controller
                     // Numeric type - perform calculation if factors exist
                     $inputValue = floatval($answerData['value'] ?? 0);
                     
+                    // Store actual answer (user input)
+                    $dataToSave['actual_answer'] = $inputValue;
+                    
                     if ($question->equation && $question->equation->factors->count() > 0) {
                         $result = $inputValue;
                         
-                        // Apply factors sequentially
+                        // Apply factors sequentially for calculated answer
                         foreach ($question->equation->factors as $factor) {
                             switch ($factor->operation) {
                                 case 'multiply':
@@ -274,29 +294,87 @@ class AssessmentController extends Controller
                             }
                         }
                         
+                        // Store calculated answer
                         $dataToSave['numeric_value'] = $result;
                     } else {
-                        // No factors, just store the input value
+                        // No factors, calculated answer is same as actual answer
                         $dataToSave['numeric_value'] = $inputValue;
                     }
                     
                     $dataToSave['option_id'] = null;
                     $dataToSave['text_value'] = null;
+                    $dataToSave['selected_options'] = null;
                 } elseif ($question->question_type_id == 2) {
                     // MCQ type - store option_id
                     $dataToSave['option_id'] = $answerData['option_id'] ?? null;
                     $dataToSave['numeric_value'] = null;
+                    $dataToSave['actual_answer'] = null;
+                    $dataToSave['text_value'] = null;
+                    $dataToSave['selected_options'] = null;
+                } elseif ($question->question_type_id == 3) {
+                    // Multiple Select type - store array of option_ids
+                    $dataToSave['selected_options'] = $answerData['option_ids'] ?? [];
+                    $dataToSave['option_id'] = null;
+                    $dataToSave['numeric_value'] = null;
+                    $dataToSave['actual_answer'] = null;
                     $dataToSave['text_value'] = null;
                 }
 
                 // Update or create answer
-                Answer::updateOrCreate(
+                $answer = Answer::updateOrCreate(
                     [
                         'assessment_id' => $assessment->id,
                         'question_id' => $answerData['question_id'],
                     ],
                     $dataToSave
                 );
+
+                // Handle file uploads for this question
+                if ($request->hasFile("answers.{$answerIndex}.documents")) {
+                    $files = $request->file("answers.{$answerIndex}.documents");
+                    
+                    foreach ($files as $file) {
+                        // Generate unique filename
+                        $originalName = $file->getClientOriginalName();
+                        $fileName = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                        
+                        // Store file in storage/app/supporting_documents/{assessment_id}/{question_id}
+                        $filePath = $file->storeAs(
+                            "supporting_documents/{$assessment->id}/{$question->id}",
+                            $fileName,
+                            'public'
+                        );
+
+                        // Create document record
+                        SupportingDocument::create([
+                            'assessment_id' => $assessment->id,
+                            'question_id' => $question->id,
+                            'answer_id' => $answer->id,
+                            'file_name' => $fileName,
+                            'file_path' => $filePath,
+                            'original_name' => $originalName,
+                            'file_size' => $file->getSize(),
+                            'mime_type' => $file->getMimeType(),
+                            'uploaded_by' => auth()->id(),
+                        ]);
+                    }
+                }
+            }
+
+            // Check if submitting for review
+            if ($request->submit_action === 'submit') {
+                $assessment->update([
+                    'status' => 'in_review',
+                    'submitted_at' => now(),
+                ]);
+                
+                // Notify all admins and managers about the submission
+                $adminsAndManagers = User::role(['admin', 'manager'])->get();
+                Notification::send($adminsAndManagers, new AssessmentSubmittedNotification($assessment, auth()->user()));
+                
+                DB::commit();
+                return redirect()->route('assessments.show', $assessment)
+                    ->with('success', 'Assessment submitted for review successfully.');
             }
 
             DB::commit();
@@ -308,5 +386,50 @@ class AssessmentController extends Controller
                 ->withInput()
                 ->with('error', 'Failed to save answers: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Approve the assessment (admin only).
+     */
+    public function approve(Assessment $assessment)
+    {
+        if ($assessment->status !== 'in_review') {
+            return redirect()->route('assessments.show', $assessment)
+                ->with('error', 'Only assessments in review can be approved.');
+        }
+
+        $assessment->update([
+            'status' => 'approved',
+        ]);
+        
+        // Notify all users connected to the factory
+        $factoryUsers = $assessment->factory->users;
+        Notification::send($factoryUsers, new AssessmentApprovedNotification($assessment));
+
+        return redirect()->route('assessments.show', $assessment)
+            ->with('success', 'Assessment approved successfully.');
+    }
+
+    /**
+     * Reject the assessment (admin only).
+     */
+    public function reject(Assessment $assessment)
+    {
+        if ($assessment->status !== 'in_review') {
+            return redirect()->route('assessments.show', $assessment)
+                ->with('error', 'Only assessments in review can be rejected.');
+        }
+
+        $assessment->update([
+            'status' => 'draft',
+        ]);
+        
+        // Notify all users connected to the factory
+        $factoryUsers = $assessment->factory->users;
+        $rejectionReason = 'Please review and resubmit your assessment.';
+        Notification::send($factoryUsers, new AssessmentRejectedNotification($assessment, $rejectionReason));
+
+        return redirect()->route('assessments.show', $assessment)
+            ->with('success', 'Assessment rejected and returned to draft status.');
     }
 }

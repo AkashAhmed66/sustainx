@@ -44,4 +44,12 @@ class Assessment extends Model
     {
         return $this->hasMany(CalculationResult::class);
     }
+
+    /**
+     * Get the supporting documents for the assessment.
+     */
+    public function supportingDocuments()
+    {
+        return $this->hasMany(SupportingDocument::class);
+    }
 }

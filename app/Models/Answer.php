@@ -14,12 +14,16 @@ class Answer extends Model
         'question_id',
         'item_id',
         'numeric_value',
+        'actual_answer',
         'text_value',
         'option_id',
+        'selected_options',
     ];
 
     protected $casts = [
         'numeric_value' => 'decimal:4',
+        'actual_answer' => 'decimal:4',
+        'selected_options' => 'array',
     ];
 
     /**
@@ -52,5 +56,13 @@ class Answer extends Model
     public function option()
     {
         return $this->belongsTo(Option::class);
+    }
+
+    /**
+     * Get the supporting documents for this answer.
+     */
+    public function supportingDocuments()
+    {
+        return $this->hasMany(SupportingDocument::class);
     }
 }

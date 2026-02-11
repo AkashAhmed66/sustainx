@@ -1,34 +1,153 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-neutral-800">
-            {{ __('Dashboard') }}
+        <h2 class="font-bold text-2xl text-neutral-900">
+            {{ __('ESG Performance Dashboard') }}
         </h2>
     </x-slot>
 
-    <div class="p-4 sm:p-6 space-y-8">
+    <div class="p-4 sm:p-6">
+        <!-- Filters Card -->
+        <div class="dashboard-card mb-6">
+            <div class="p-4">
+                <form method="GET" action="{{ route('dashboard') }}" class="flex flex-col items-start gap-3 sm:flex-row sm:items-end">
+                    <div class="w-full sm:flex-1">
+                        <label class="block text-xs font-medium text-neutral-600 mb-1">Filter by Year</label>
+                        <select name="year" 
+                                onchange="this.form.submit()"
+                                class="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-medium text-neutral-700">
+                            <option value="">All Years</option>
+                            @foreach($availableYears as $year)
+                                <option value="{{ $year }}" {{ $selectedYear == $year ? 'selected' : '' }}>
+                                    {{ $year }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    
+                    <div class="w-full sm:flex-1">
+                        <label class="block text-xs font-medium text-neutral-600 mb-1">Filter by Factory</label>
+                        <select name="factory_id" 
+                                onchange="this.form.submit()"
+                                class="w-full px-4 py-2 bg-white border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-medium text-neutral-700">
+                            <option value="">All Factories</option>
+                            @foreach($factories as $factory)
+                                <option value="{{ $factory->id }}" {{ $selectedFactoryId == $factory->id ? 'selected' : '' }}>
+                                    {{ $factory->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    
+                    <div class="w-full sm:w-auto sm:flex-shrink-0">
+                        <a href="{{ route('dashboard.comparison') }}" 
+                           class="inline-flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg hover:from-primary-700 hover:to-primary-800 transition-all shadow-md hover:shadow-lg font-semibold text-sm w-full sm:w-auto h-[42px]">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                            Comparison Dashboard
+                        </a>
+                    </div>
+                    
+                    @if($selectedYear || $selectedFactoryId)
+                        <div class="w-full sm:w-auto sm:flex-shrink-0">
+                            <a href="{{ route('dashboard') }}" 
+                               class="inline-flex items-center justify-center px-4 py-2 text-neutral-600 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors text-sm font-medium w-full sm:w-auto h-[42px]">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                                Clear Filters
+                            </a>
+                        </div>
+                    @endif
+                </form>
+            </div>
+        </div>
+
+        <div class="space-y-8">
         @forelse($sections as $section)
             <!-- Section Container -->
             <div class="space-y-4">
                 <!-- Section Header -->
-                <div class="dashboard-card bg-primary-600">
-                    <h2 class="text-white text-2xl font-bold">{{ $section->name }}</h2>
+                <div class="dashboard-card bg-gradient-to-r from-primary-600 to-primary-700 shadow-xl">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-white text-3xl font-extrabold">{{ $section->name }}</h2>
+                        <span class="px-4 py-1.5 bg-white/30 backdrop-blur-sm rounded-full text-white text-sm font-bold">
+                            {{ $section->subsections->count() }} Subsections
+                        </span>
+                    </div>
                 </div>
 
                 <!-- Subsections Grid -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     @forelse($section->subsections as $subsection)
-                        <div class="dashboard-card hover:shadow-md transition-shadow duration-200 cursor-pointer">
-                            <div class="flex flex-col items-center justify-center text-center space-y-3 py-4">
-                                <div class="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
-                                    <svg class="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        @php
+                            $queryParams = [];
+                            if($selectedYear) $queryParams['year'] = $selectedYear;
+                            if($selectedFactoryId) $queryParams['factory_id'] = $selectedFactoryId;
+                            $queryString = http_build_query($queryParams);
+                        @endphp
+                        <a href="{{ route('dashboard.subsection', $subsection) }}{{ $queryString ? '?' . $queryString : '' }}" 
+                           class="dashboard-card hover:shadow-2xl hover:scale-105 transition-all duration-200 cursor-pointer border-b-4 border-primary-600 group">
+                            <div class="flex flex-col h-full">
+                                <!-- Image/Icon Header -->
+                                <div class="flex items-center justify-between mb-3">
+                                    @if($subsection->images->count() > 0)
+                                        <!-- Subsection Images Gallery -->
+                                        <div class="flex gap-1.5">
+                                            @foreach($subsection->images->take(3) as $image)
+                                                <div class="w-14 h-14 rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-shadow">
+                                                    <img src="{{ $image->image_url }}" 
+                                                         alt="{{ $subsection->name }} - Image {{ $loop->iteration }}"
+                                                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300">
+                                                </div>
+                                            @endforeach
+                                            @if($subsection->images->count() > 3)
+                                                <div class="w-14 h-14 rounded-xl bg-neutral-100 flex items-center justify-center shadow-lg">
+                                                    <span class="text-xs font-bold text-neutral-600">+{{ $subsection->images->count() - 3 }}</span>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @elseif($subsection->image_path)
+                                        <!-- Legacy Single Image -->
+                                        <div class="w-14 h-14 rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-shadow">
+                                            <img src="{{ $subsection->image_url }}" 
+                                                 alt="{{ $subsection->name }}"
+                                                 class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300">
+                                        </div>
+                                    @else
+                                        <!-- Default Icon -->
+                                        <div class="w-14 h-14 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
+                                            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                            </svg>
+                                        </div>
+                                    @endif
+                                    <svg class="w-6 h-6 text-neutral-400 group-hover:text-primary-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
                                     </svg>
                                 </div>
-                                <h3 class="text-neutral-800 font-semibold text-base leading-tight px-2">
+                                
+                                <!-- Subsection Name -->
+                                <h3 class="text-neutral-900 font-bold text-lg leading-tight mb-3 flex-grow">
                                     {{ $subsection->name }}
                                 </h3>
+                                
+                                <!-- Cumulative Data -->
+                                <div class="pt-3 border-t-2 border-neutral-200">
+                                    <div class="flex items-baseline justify-between">
+                                        <span class="text-xs text-neutral-600 font-bold uppercase">Total Value</span>
+                                        <div class="text-right">
+                                            <span class="text-2xl font-extrabold text-primary-700">
+                                                {{ number_format($subsection->cumulative_total, 2) }}
+                                            </span>
+                                            @if($subsection->unit)
+                                                <span class="text-sm text-neutral-700 ml-1 font-semibold">{{ $subsection->unit }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        </a>
                     @empty
                         <div class="col-span-full dashboard-card text-center py-8">
                             <svg class="w-12 h-12 mx-auto text-neutral-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -42,18 +161,21 @@
         @empty
             <!-- Empty State -->
             <div class="dashboard-card text-center py-12">
-                <svg class="w-16 h-16 mx-auto text-neutral-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-20 h-20 mx-auto text-neutral-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                 </svg>
-                <h3 class="text-lg font-semibold text-neutral-700 mb-2">No Sections Available</h3>
-                <p class="text-neutral-500 mb-6">Start by creating sections for your dashboard.</p>
-                <a href="{{ route('sections.create') }}" class="btn-primary inline-flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                    </svg>
-                    Create Section
-                </a>
+                <h3 class="text-xl font-bold text-neutral-700 mb-2">No Data Available</h3>
+                <p class="text-neutral-600 mb-6 font-medium">No assessment data found for the selected filters.</p>
+                @can('create assessments')
+                    <a href="{{ route('assessments.create') }}" class="btn-primary inline-flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        Create Assessment
+                    </a>
+                @endcan
             </div>
         @endforelse
+        </div>
     </div>
 </x-app-layout>

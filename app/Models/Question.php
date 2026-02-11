@@ -13,7 +13,8 @@ class Question extends Model
         'item_id',
         'question_text',
         'question_type_id',
-        'unit',
+        'input_unit',
+        'output_unit',
         'is_required',
         'is_active',
     ];
@@ -69,5 +70,13 @@ class Question extends Model
     public function calculationResults()
     {
         return $this->hasMany(CalculationResult::class);
+    }
+
+    /**
+     * Get the supporting documents for the question.
+     */
+    public function supportingDocuments()
+    {
+        return $this->hasMany(SupportingDocument::class);
     }
 }

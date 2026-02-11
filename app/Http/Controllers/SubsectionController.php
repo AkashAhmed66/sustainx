@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Subsection;
-use App\Models\Section;
-use Illuminate\Http\Request;
+use App\Models\Section;use App\Models\SubsectionImage;use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class SubsectionController extends Controller
 {
@@ -13,7 +13,7 @@ class SubsectionController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Subsection::with('section')->withCount('items');
+        $query = Subsection::with('section')->withCount(['items', 'images']);
 
         // Search
         if ($request->filled('search')) {
@@ -42,6 +42,7 @@ class SubsectionController extends Controller
             'description' => 'Description',
             'order_no' => 'Order',
             'items_count' => 'Items',
+            'images_count' => 'Images',
             'is_active' => 'Status',
             'actions' => 'Actions',
         ];
@@ -81,11 +82,32 @@ class SubsectionController extends Controller
             'section_id' => 'required|exists:sections,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'images' => 'nullable|array',
+            'images.*' => 'image|mimes:jpeg,jpg,png,gif,svg,webp|max:5120',
             'order_no' => 'required|integer|min:0',
             'is_active' => 'boolean',
         ]);
 
-        Subsection::create($validated);
+        // Remove images from validated array as we'll handle them separately
+        $images = $validated['images'] ?? [];
+        unset($validated['images']);
+
+        // Create subsection
+        $subsection = Subsection::create($validated);
+
+        // Handle multiple image uploads
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $index => $image) {
+                $fileName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
+                $imagePath = $image->storeAs('subsection_images', $fileName, 'public');
+
+                SubsectionImage::create([
+                    'subsection_id' => $subsection->id,
+                    'image_path' => $imagePath,
+                    'order_no' => $index + 1,
+                ]);
+            }
+        }
 
         return redirect()->route('subsections.index')
             ->with('success', 'Subsection created successfully.');
@@ -97,6 +119,7 @@ class SubsectionController extends Controller
     public function edit(Subsection $subsection)
     {
         $sections = Section::where('is_active', true)->orderBy('order_no')->get();
+        $subsection->load('images');
         return view('subsections.edit', compact('subsection', 'sections'));
     }
 
@@ -109,11 +132,34 @@ class SubsectionController extends Controller
             'section_id' => 'required|exists:sections,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'images' => 'nullable|array',
+            'images.*' => 'image|mimes:jpeg,jpg,png,gif,svg,webp|max:5120',
             'order_no' => 'required|integer|min:0',
             'is_active' => 'boolean',
         ]);
 
+        // Remove images from validated array
+        unset($validated['images']);
+
+        // Update subsection
         $subsection->update($validated);
+
+        // Handle new image uploads
+        if ($request->hasFile('images')) {
+            // Get the current max order number
+            $maxOrderNo = $subsection->images()->max('order_no') ?? 0;
+
+            foreach ($request->file('images') as $index => $image) {
+                $fileName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
+                $imagePath = $image->storeAs('subsection_images', $fileName, 'public');
+
+                SubsectionImage::create([
+                    'subsection_id' => $subsection->id,
+                    'image_path' => $imagePath,
+                    'order_no' => $maxOrderNo + $index + 1,
+                ]);
+            }
+        }
 
         return redirect()->route('subsections.index')
             ->with('success', 'Subsection updated successfully.');
@@ -128,6 +174,19 @@ class SubsectionController extends Controller
 
         return redirect()->route('subsections.index')
             ->with('success', 'Subsection deleted successfully.');
+    }
+
+    /**
+     * Remove a specific image from subsection.
+     */
+    public function deleteImage(SubsectionImage $image)
+    {
+        $image->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Image deleted successfully.'
+        ]);
     }
 
     /**

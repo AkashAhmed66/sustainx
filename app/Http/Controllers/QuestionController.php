@@ -48,7 +48,8 @@ class QuestionController extends Controller
             'question_text' => 'Question',
             'item' => 'Item',
             'question_type' => 'Type',
-            'unit' => 'Unit',
+            'input_unit' => 'Input Unit',
+            'output_unit' => 'Output Unit',
             'is_required' => 'Required',
             'is_active' => 'Status',
             'actions' => 'Actions',
@@ -103,7 +104,8 @@ class QuestionController extends Controller
             'item_id' => 'required|exists:items,id',
             'question_text' => 'required|string',
             'question_type_id' => 'required|exists:question_types,id',
-            'unit' => 'nullable|string|max:255',
+            'input_unit' => 'nullable|string|max:255',
+            'output_unit' => 'nullable|string|max:255',
             'is_required' => 'boolean',
             'is_active' => 'boolean',
         ];
@@ -117,8 +119,8 @@ class QuestionController extends Controller
             $rules['factors.*.operation'] = 'nullable|string|in:multiply,add,subtract,divide';
             $rules['factors.*.factor_value'] = 'nullable|numeric';
             $rules['factors.*.country_id'] = 'nullable|exists:countries,id';
-        } elseif ($request->question_type_id == 2) {
-            // MCQ type - validate options
+        } elseif ($request->question_type_id == 2 || $request->question_type_id == 3) {
+            // MCQ and Multiple Select types - validate options
             $rules['options'] = 'nullable|array';
             $rules['options.*.option_text'] = 'nullable|string|max:255';
             $rules['options.*.option_value'] = 'nullable|numeric';
@@ -134,7 +136,8 @@ class QuestionController extends Controller
                 'item_id' => $validated['item_id'],
                 'question_text' => $validated['question_text'],
                 'question_type_id' => $validated['question_type_id'],
-                'unit' => $validated['unit'] ?? null,
+                'input_unit' => $validated['input_unit'] ?? null,
+                'output_unit' => $validated['output_unit'] ?? null,
                 'is_required' => $request->has('is_required'),
                 'is_active' => $request->has('is_active'),
             ]);
@@ -167,8 +170,8 @@ class QuestionController extends Controller
                 }
             }
 
-            // Handle MCQ type - create options
-            if ($validated['question_type_id'] == 2) {
+            // Handle MCQ and Multiple Select types - create options
+            if ($validated['question_type_id'] == 2 || $validated['question_type_id'] == 3) {
                 $hasOptions = !empty($validated['options']) && collect($validated['options'])->filter(function($option) {
                     return !empty($option['option_text']);
                 })->count() > 0;
@@ -259,7 +262,8 @@ class QuestionController extends Controller
             'item_id' => 'required|exists:items,id',
             'question_text' => 'required|string',
             'question_type_id' => 'required|exists:question_types,id',
-            'unit' => 'nullable|string|max:255',
+            'input_unit' => 'nullable|string|max:255',
+            'output_unit' => 'nullable|string|max:255',
             'is_required' => 'boolean',
             'is_active' => 'boolean',
         ];
@@ -273,8 +277,8 @@ class QuestionController extends Controller
             $rules['factors.*.operation'] = 'nullable|string|in:multiply,add,subtract,divide';
             $rules['factors.*.factor_value'] = 'nullable|numeric';
             $rules['factors.*.country_id'] = 'nullable|exists:countries,id';
-        } elseif ($request->question_type_id == 2) {
-            // MCQ type - validate options
+        } elseif ($request->question_type_id == 2 || $request->question_type_id == 3) {
+            // MCQ and Multiple Select types - validate options
             $rules['options'] = 'nullable|array';
             $rules['options.*.option_text'] = 'nullable|string|max:255';
             $rules['options.*.option_value'] = 'nullable|numeric';
@@ -290,7 +294,8 @@ class QuestionController extends Controller
                 'item_id' => $validated['item_id'],
                 'question_text' => $validated['question_text'],
                 'question_type_id' => $validated['question_type_id'],
-                'unit' => $validated['unit'] ?? null,
+                'input_unit' => $validated['input_unit'] ?? null,
+                'output_unit' => $validated['output_unit'] ?? null,
                 'is_required' => $request->has('is_required'),
                 'is_active' => $request->has('is_active'),
             ]);
@@ -341,9 +346,9 @@ class QuestionController extends Controller
                 }
             }
 
-            // If type is MCQ
-            if ($validated['question_type_id'] == 2) {
-                // Delete old equation and factors if type changed to MCQ
+            // If type is MCQ or Multiple Select
+            if ($validated['question_type_id'] == 2 || $validated['question_type_id'] == 3) {
+                // Delete old equation and factors if type changed to MCQ/Multiple Select
                 if ($question->equation) {
                     $question->equation->factors()->delete();
                     $question->equation->delete();

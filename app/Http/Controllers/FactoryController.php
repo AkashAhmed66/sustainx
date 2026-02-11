@@ -74,7 +74,8 @@ class FactoryController extends Controller
     {
         $factoryTypes = FactoryType::all();
         $countries = Country::orderBy('name')->get();
-        return view('factories.create', compact('factoryTypes', 'countries'));
+        $users = \App\Models\User::orderBy('name')->get();
+        return view('factories.create', compact('factoryTypes', 'countries', 'users'));
     }
 
     /**
@@ -88,9 +89,16 @@ class FactoryController extends Controller
             'country_id' => 'required|exists:countries,id',
             'address' => 'nullable|string',
             'is_active' => 'boolean',
+            'user_ids' => 'nullable|array',
+            'user_ids.*' => 'exists:users,id',
         ]);
 
-        Factory::create($validated);
+        $factory = Factory::create($validated);
+
+        // Sync users if provided
+        if ($request->has('user_ids')) {
+            $factory->users()->sync($request->user_ids);
+        }
 
         return redirect()->route('factories.index')
             ->with('success', 'Factory created successfully.');
@@ -101,9 +109,11 @@ class FactoryController extends Controller
      */
     public function edit(Factory $factory)
     {
+        $factory->load('users');
         $factoryTypes = FactoryType::all();
         $countries = Country::orderBy('name')->get();
-        return view('factories.edit', compact('factory', 'factoryTypes', 'countries'));
+        $users = \App\Models\User::orderBy('name')->get();
+        return view('factories.edit', compact('factory', 'factoryTypes', 'countries', 'users'));
     }
 
     /**
@@ -117,9 +127,14 @@ class FactoryController extends Controller
             'country_id' => 'required|exists:countries,id',
             'address' => 'nullable|string',
             'is_active' => 'boolean',
+            'user_ids' => 'nullable|array',
+            'user_ids.*' => 'exists:users,id',
         ]);
 
         $factory->update($validated);
+
+        // Sync users
+        $factory->users()->sync($request->user_ids ?? []);
 
         return redirect()->route('factories.index')
             ->with('success', 'Factory updated successfully.');

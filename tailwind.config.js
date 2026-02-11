@@ -15,19 +15,19 @@ export default {
                 sans: ['Figtree', ...defaultTheme.fontFamily.sans],
             },
             colors: {
-                // Primary matte greenish theme
+                // Primary bold greenish theme
                 primary: {
-                    50: '#f0f9f4',
-                    100: '#daf2e4',
-                    200: '#b8e4cd',
-                    300: '#88d0ad',
-                    400: '#56b689',
-                    500: '#3a9b6f',
-                    600: '#2a7d59',
-                    700: '#236349',
-                    800: '#1e4f3b',
-                    900: '#1a4232',
-                    950: '#0d251c',
+                    50: '#ecfdf5',
+                    100: '#d1fae5',
+                    200: '#a7f3d0',
+                    300: '#6ee7b7',
+                    400: '#34d399',
+                    500: '#10b981',
+                    600: '#059669',
+                    700: '#047857',
+                    800: '#065f46',
+                    900: '#064e3b',
+                    950: '#022c22',
                 },
                 // Secondary colors for accents
                 secondary: {

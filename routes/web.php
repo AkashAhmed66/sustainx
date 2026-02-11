@@ -12,29 +12,41 @@ use App\Http\Controllers\CountryController;
 use App\Http\Controllers\FactoryTypeController;
 use App\Http\Controllers\FactoryController;
 use App\Http\Controllers\AssessmentController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
+    // return view('welcome');
 });
 
-Route::get('/dashboard', function () {
-    $sections = \App\Models\Section::with(['subsections' => function($q) {
-        $q->where('is_active', true)->orderBy('order_no');
-    }])->where('is_active', true)
-      ->orderBy('order_no')
-      ->get();
-    
-    $totalFactories = \App\Models\Factory::count();
-    $respondedFactories = \App\Models\Assessment::distinct('factory_id')->count();
-    
-    return view('dashboard', compact('sections', 'totalFactories', 'respondedFactories'));
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
+
+Route::get('/dashboard/comparison', [DashboardController::class, 'comparison'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard.comparison');
+
+Route::get('/dashboard/subsection/{subsection}', [DashboardController::class, 'subsectionDetails'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard.subsection');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Notification Routes
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/{id}/read', [NotificationController::class, 'markAsReadAndRedirect'])->name('notifications.read');
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+    Route::get('/notifications/unread', [NotificationController::class, 'unread'])->name('notifications.unread');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+    Route::delete('/notifications/delete-all-read', [NotificationController::class, 'deleteAllRead'])->name('notifications.delete-all-read');
 
     // User Management Routes
     Route::middleware('permission:view users')->group(function () {
@@ -115,6 +127,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:edit subsections')->group(function () {
         Route::get('/subsections/{subsection}/edit', [SubsectionController::class, 'edit'])->name('subsections.edit');
         Route::put('/subsections/{subsection}', [SubsectionController::class, 'update'])->name('subsections.update');
+        Route::delete('/subsection-images/{image}', [SubsectionController::class, 'deleteImage'])->name('subsection-images.delete');
     });
     Route::middleware('permission:delete subsections')->group(function () {
         Route::delete('/subsections/{subsection}', [SubsectionController::class, 'destroy'])->name('subsections.destroy');
@@ -222,6 +235,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:edit assessments')->group(function () {
         Route::get('/assessments/{assessment}/edit', [AssessmentController::class, 'edit'])->name('assessments.edit');
         Route::put('/assessments/{assessment}', [AssessmentController::class, 'update'])->name('assessments.update');
+        Route::post('/assessments/{assessment}/approve', [AssessmentController::class, 'approve'])->name('assessments.approve');
+        Route::post('/assessments/{assessment}/reject', [AssessmentController::class, 'reject'])->name('assessments.reject');
     });
     Route::middleware('permission:delete assessments')->group(function () {
         Route::delete('/assessments/{assessment}', [AssessmentController::class, 'destroy'])->name('assessments.destroy');

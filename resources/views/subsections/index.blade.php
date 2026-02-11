@@ -49,6 +49,12 @@
                                 {{ $item->items_count }}
                             </span>
                         </td>
+                    @elseif($key === 'images_count')
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {{ $item->images_count }}
+                            </span>
+                        </td>
                     @elseif($key === 'is_active')
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
