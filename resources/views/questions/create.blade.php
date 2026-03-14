@@ -11,9 +11,43 @@
                 <form action="{{ route('questions.store') }}" method="POST" 
                       x-data="{
                           questionType: '{{ old('question_type_id', '') }}',
+                          selectedItemId: '{{ old('item_id', '') }}',
+                          triggerQuestions: {{ $triggerQuestionsJson }},
+                          triggerQuestionId: '{{ old('depends_on_question_id', '') }}',
+                          triggerOptionId: '{{ old('depends_on_option_id', '') }}',
                           options: {{ old('options') ? json_encode(old('options')) : $defaultOptions }},
                           factors: {{ old('factors') ? json_encode(old('factors')) : $defaultFactors }},
                           equationName: '{{ old('equation_name', '') }}',
+                          get filteredTriggerQuestions() {
+                              if (!this.selectedItemId) {
+                                  return [];
+                              }
+
+                              return this.triggerQuestions.filter((question) => String(question.item_id) === String(this.selectedItemId));
+                          },
+                          get selectedTriggerQuestion() {
+                              return this.filteredTriggerQuestions.find((question) => String(question.id) === String(this.triggerQuestionId)) || null;
+                          },
+                          get availableTriggerOptions() {
+                              return this.selectedTriggerQuestion ? this.selectedTriggerQuestion.options : [];
+                          },
+                          syncDependencySelection() {
+                              const stillValidQuestion = this.filteredTriggerQuestions.some((question) => String(question.id) === String(this.triggerQuestionId));
+                              if (!stillValidQuestion) {
+                                  this.triggerQuestionId = '';
+                                  this.triggerOptionId = '';
+                                  return;
+                              }
+
+                              const stillValidOption = this.availableTriggerOptions.some((option) => String(option.id) === String(this.triggerOptionId));
+                              if (!stillValidOption) {
+                                  this.triggerOptionId = '';
+                              }
+                          },
+                          clearDependency() {
+                              this.triggerQuestionId = '';
+                              this.triggerOptionId = '';
+                          },
                           addOption() {
                               this.options.push({
                                   option_text: '',
@@ -43,7 +77,8 @@
                                   this.factors.forEach((fac, idx) => fac.sn = idx + 1);
                               }
                           }
-                      }">
+                      }"
+                      x-effect="syncDependencySelection()">
                     @csrf
 
                     <div class="grid grid-cols-1 gap-6 mb-6">
@@ -54,6 +89,7 @@
                             </label>
                             <select name="item_id"
                                     id="item_id"
+                                    x-model="selectedItemId"
                                     required
                                     class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('item_id') border-red-500 @enderror">
                                 <option value="">Select Item</option>
@@ -106,6 +142,68 @@
                             @enderror
                         </div>
 
+                        <!-- Conditional Dependency -->
+                        <div class="border border-neutral-200 rounded-xl p-4 bg-neutral-50">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-sm font-medium text-neutral-700">
+                                    Conditional Visibility <span class="text-neutral-500 text-xs">(Optional)</span>
+                                </label>
+                                <button type="button"
+                                        x-show="triggerQuestionId || triggerOptionId"
+                                        @click="clearDependency()"
+                                        class="text-xs px-2 py-1 rounded bg-neutral-200 text-neutral-700 hover:bg-neutral-300 transition-colors">
+                                    Clear
+                                </button>
+                            </div>
+
+                            <p class="text-xs text-neutral-600 mb-4">
+                                Show this question only when a specific option is selected in an existing MCQ/Multiple Select question from the same item.
+                            </p>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="depends_on_question_id" class="block text-sm font-medium text-neutral-700 mb-2">
+                                        Existing Question
+                                    </label>
+                                    <select name="depends_on_question_id"
+                                            id="depends_on_question_id"
+                                            x-model="triggerQuestionId"
+                                            class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('depends_on_question_id') border-red-500 @enderror">
+                                        <option value="">Always visible (no dependency)</option>
+                                        <template x-for="triggerQuestion in filteredTriggerQuestions" :key="triggerQuestion.id">
+                                            <option :value="triggerQuestion.id" x-text="triggerQuestion.label"></option>
+                                        </template>
+                                    </select>
+                                    @error('depends_on_question_id')
+                                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+
+                                <div>
+                                    <label for="depends_on_option_id" class="block text-sm font-medium text-neutral-700 mb-2">
+                                        Existing Question Option
+                                    </label>
+                                    <select name="depends_on_option_id"
+                                            id="depends_on_option_id"
+                                            x-model="triggerOptionId"
+                                            :disabled="!triggerQuestionId"
+                                            class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed @error('depends_on_option_id') border-red-500 @enderror">
+                                        <option value="">Select option</option>
+                                        <template x-for="triggerOption in availableTriggerOptions" :key="triggerOption.id">
+                                            <option :value="triggerOption.id" x-text="triggerOption.option_text"></option>
+                                        </template>
+                                    </select>
+                                    @error('depends_on_option_id')
+                                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            </div>
+
+                            <p class="mt-3 text-xs text-neutral-500" x-show="selectedItemId && filteredTriggerQuestions.length === 0">
+                                No eligible MCQ/Multiple Select question exists for the selected item yet.
+                            </p>
+                        </div>
+
                         <!-- Input Unit -->
                         <div>
                             <label for="input_unit" class="block text-sm font-medium text-neutral-700 mb-2">
@@ -139,7 +237,7 @@
                         </div>
 
                         <!-- Equation Section (for Numeric type) -->
-                        <div x-show="questionType == '1'"
+                        <div x-show="questionType == '1'">
                             <div class="border border-neutral-200 rounded-xl p-4 bg-neutral-50">
                                 <h3 class="font-medium text-neutral-800 mb-4">Equation & Factors</h3>
                                 
@@ -232,7 +330,7 @@
                         </div>
 
                         <!-- Options Section (for MCQ and Multiple Select types) -->
-                        <div x-show="questionType == '2' || questionType == '3'"
+                        <div x-show="questionType == '2' || questionType == '3'">
                             <div class="border border-neutral-200 rounded-xl p-4 bg-neutral-50">
                                 <h3 class="font-medium text-neutral-800 mb-4">
                                     <span x-text="questionType == '3' ? 'Multiple Select Options' : 'Multiple Choice Options'"></span>

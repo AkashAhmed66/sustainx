@@ -14,8 +14,10 @@ use App\Notifications\AssessmentSubmittedNotification;
 use App\Notifications\AssessmentApprovedNotification;
 use App\Notifications\AssessmentRejectedNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\ValidationException;
 
 class AssessmentController extends Controller
 {
@@ -234,7 +236,30 @@ class AssessmentController extends Controller
         // Get existing answers keyed by question_id
         $existingAnswers = $assessment->answers->keyBy('question_id');
 
-        return view('assessments.perform', compact('assessment', 'sections', 'existingAnswers'));
+        $questionDependencyMap = [];
+        $initialAnswerState = [];
+
+        foreach ($sections as $section) {
+            foreach ($section->subsections as $subsection) {
+                foreach ($subsection->items as $item) {
+                    foreach ($item->questions as $question) {
+                        $questionDependencyMap[$question->id] = [
+                            'question_type_id' => (int) $question->question_type_id,
+                            'depends_on_question_id' => $question->depends_on_question_id ? (int) $question->depends_on_question_id : null,
+                            'depends_on_option_id' => $question->depends_on_option_id ? (int) $question->depends_on_option_id : null,
+                        ];
+
+                        $existingAnswer = $existingAnswers->get($question->id);
+                        $initialAnswerState[$question->id] = [
+                            'selectedOptionId' => $existingAnswer?->option_id ? (int) $existingAnswer->option_id : null,
+                            'selectedOptionIds' => array_map('intval', $existingAnswer?->selected_options ?? []),
+                        ];
+                    }
+                }
+            }
+        }
+
+        return view('assessments.perform', compact('assessment', 'sections', 'existingAnswers', 'questionDependencyMap', 'initialAnswerState'));
     }
 
     /**
@@ -254,29 +279,84 @@ class AssessmentController extends Controller
             'item_documents.*' => 'nullable|array',
             'item_documents.*.*' => 'nullable|file|max:10240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', // 10MB max
             'submit_action' => 'nullable|in:save,submit',
+            'save_item_id' => 'nullable|integer|exists:items,id',
         ]);
+
+        $saveItemId = isset($validated['save_item_id']) ? (int) $validated['save_item_id'] : null;
+
+        $answers = collect($validated['answers']);
+        if ($saveItemId) {
+            $answers = $answers
+                ->filter(fn ($answer) => (int) ($answer['item_id'] ?? 0) === $saveItemId)
+                ->values();
+        }
+
+        $questionIds = $answers
+            ->pluck('question_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $questions = Question::with([
+                'questionType',
+                'equation.factors',
+                'options:id,question_id',
+            ])
+            ->whereIn('id', $questionIds)
+            ->get()
+            ->keyBy('id');
+
+        $submittedAnswerState = $this->buildSubmittedAnswerState($answers->all(), $questions);
+        $visibilityMemo = [];
 
         DB::beginTransaction();
         try {
-            foreach ($validated['answers'] as $answerData) {
-                if (empty($answerData['value']) && empty($answerData['option_id']) && empty($answerData['option_ids'])) {
+            foreach ($answers as $answerData) {
+                $questionId = (int) $answerData['question_id'];
+                $itemId = (int) $answerData['item_id'];
+                $question = $questions->get($questionId);
+
+                if (!$question) {
                     continue;
                 }
 
-                // Get the question to determine type
-                $question = Question::with(['questionType', 'equation.factors'])
-                    ->findOrFail($answerData['question_id']);
+                if ((int) $question->item_id !== $itemId) {
+                    throw ValidationException::withMessages([
+                        'answers' => 'Invalid question and item combination submitted.',
+                    ]);
+                }
+
+                $isVisible = $this->isQuestionVisibleForSubmission(
+                    $questionId,
+                    $questions,
+                    $submittedAnswerState,
+                    $visibilityMemo
+                );
+
+                if (!$isVisible) {
+                    Answer::where('assessment_id', $assessment->id)
+                        ->where('question_id', $questionId)
+                        ->delete();
+                    continue;
+                }
 
                 $dataToSave = [
                     'assessment_id' => $assessment->id,
-                    'question_id' => $answerData['question_id'],
-                    'item_id' => $answerData['item_id'],
+                    'question_id' => $questionId,
+                    'item_id' => $itemId,
                 ];
 
                 // Handle based on question type
                 if ($question->question_type_id == 1) {
                     // Numeric type - perform calculation if factors exist
-                    $inputValue = floatval($answerData['value'] ?? 0);
+                    if (!isset($answerData['value']) || $answerData['value'] === '' || $answerData['value'] === null) {
+                        Answer::where('assessment_id', $assessment->id)
+                            ->where('question_id', $questionId)
+                            ->delete();
+                        continue;
+                    }
+
+                    $inputValue = floatval($answerData['value']);
                     
                     // Store actual answer (user input)
                     $dataToSave['actual_answer'] = $inputValue;
@@ -316,14 +396,38 @@ class AssessmentController extends Controller
                     $dataToSave['selected_options'] = null;
                 } elseif ($question->question_type_id == 2) {
                     // MCQ type - store option_id
-                    $dataToSave['option_id'] = $answerData['option_id'] ?? null;
+                    $selectedOptionId = isset($answerData['option_id']) ? (int) $answerData['option_id'] : null;
+                    $validOptionIds = $question->options->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+                    if (!$selectedOptionId || !in_array($selectedOptionId, $validOptionIds, true)) {
+                        Answer::where('assessment_id', $assessment->id)
+                            ->where('question_id', $questionId)
+                            ->delete();
+                        continue;
+                    }
+
+                    $dataToSave['option_id'] = $selectedOptionId;
                     $dataToSave['numeric_value'] = null;
                     $dataToSave['actual_answer'] = null;
                     $dataToSave['text_value'] = null;
                     $dataToSave['selected_options'] = null;
                 } elseif ($question->question_type_id == 3) {
                     // Multiple Select type - store array of option_ids
-                    $dataToSave['selected_options'] = $answerData['option_ids'] ?? [];
+                    $validOptionIds = $question->options->pluck('id')->map(fn ($id) => (int) $id)->all();
+                    $selectedOptionIds = collect($answerData['option_ids'] ?? [])
+                        ->map(fn ($id) => (int) $id)
+                        ->filter(fn ($id) => in_array($id, $validOptionIds, true))
+                        ->values()
+                        ->all();
+
+                    if (count($selectedOptionIds) === 0) {
+                        Answer::where('assessment_id', $assessment->id)
+                            ->where('question_id', $questionId)
+                            ->delete();
+                        continue;
+                    }
+
+                    $dataToSave['selected_options'] = $selectedOptionIds;
                     $dataToSave['option_id'] = null;
                     $dataToSave['numeric_value'] = null;
                     $dataToSave['actual_answer'] = null;
@@ -334,7 +438,7 @@ class AssessmentController extends Controller
                 Answer::updateOrCreate(
                     [
                         'assessment_id' => $assessment->id,
-                        'question_id' => $answerData['question_id'],
+                        'question_id' => $questionId,
                     ],
                     $dataToSave
                 );
@@ -347,6 +451,10 @@ class AssessmentController extends Controller
                 }
 
                 $itemId = (int) $itemId;
+                if ($saveItemId && $itemId !== $saveItemId) {
+                    continue;
+                }
+
                 if (!Item::whereKey($itemId)->exists()) {
                     continue;
                 }
@@ -411,6 +519,117 @@ class AssessmentController extends Controller
                 ->withInput()
                 ->with('error', 'Failed to save answers: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Build a compact state map from submitted answers for visibility checks.
+     */
+    private function buildSubmittedAnswerState(array $answers, Collection $questions): array
+    {
+        $state = [];
+
+        foreach ($answers as $answerData) {
+            $questionId = isset($answerData['question_id']) ? (int) $answerData['question_id'] : 0;
+            $question = $questions->get($questionId);
+
+            if (!$question) {
+                continue;
+            }
+
+            $state[$questionId] = [
+                'selectedOptionId' => null,
+                'selectedOptionIds' => [],
+            ];
+
+            if ((int) $question->question_type_id === 2) {
+                $state[$questionId]['selectedOptionId'] = isset($answerData['option_id']) && $answerData['option_id'] !== ''
+                    ? (int) $answerData['option_id']
+                    : null;
+            }
+
+            if ((int) $question->question_type_id === 3) {
+                $state[$questionId]['selectedOptionIds'] = collect($answerData['option_ids'] ?? [])
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all();
+            }
+        }
+
+        return $state;
+    }
+
+    /**
+     * Evaluate whether a question should be visible based on submitted trigger answers.
+     */
+    private function isQuestionVisibleForSubmission(
+        int $questionId,
+        Collection $questions,
+        array $submittedAnswerState,
+        array &$memo,
+        array $trail = []
+    ): bool {
+        if (array_key_exists($questionId, $memo)) {
+            return $memo[$questionId];
+        }
+
+        if (in_array($questionId, $trail, true)) {
+            $memo[$questionId] = false;
+            return false;
+        }
+
+        /** @var Question|null $question */
+        $question = $questions->get($questionId);
+        if (!$question) {
+            $memo[$questionId] = false;
+            return false;
+        }
+
+        $dependsOnQuestionId = $question->depends_on_question_id ? (int) $question->depends_on_question_id : null;
+        $dependsOnOptionId = $question->depends_on_option_id ? (int) $question->depends_on_option_id : null;
+
+        if (!$dependsOnQuestionId || !$dependsOnOptionId) {
+            $memo[$questionId] = true;
+            return true;
+        }
+
+        $parentVisible = $this->isQuestionVisibleForSubmission(
+            $dependsOnQuestionId,
+            $questions,
+            $submittedAnswerState,
+            $memo,
+            [...$trail, $questionId]
+        );
+
+        if (!$parentVisible) {
+            $memo[$questionId] = false;
+            return false;
+        }
+
+        /** @var Question|null $parentQuestion */
+        $parentQuestion = $questions->get($dependsOnQuestionId);
+        if (!$parentQuestion) {
+            $memo[$questionId] = false;
+            return false;
+        }
+
+        $parentState = $submittedAnswerState[$dependsOnQuestionId] ?? [
+            'selectedOptionId' => null,
+            'selectedOptionIds' => [],
+        ];
+
+        if ((int) $parentQuestion->question_type_id === 2) {
+            $memo[$questionId] = (int) ($parentState['selectedOptionId'] ?? 0) === $dependsOnOptionId;
+            return $memo[$questionId];
+        }
+
+        if ((int) $parentQuestion->question_type_id === 3) {
+            $selected = array_map('intval', $parentState['selectedOptionIds'] ?? []);
+            $memo[$questionId] = in_array($dependsOnOptionId, $selected, true);
+            return $memo[$questionId];
+        }
+
+        $memo[$questionId] = false;
+        return false;
     }
 
     /**

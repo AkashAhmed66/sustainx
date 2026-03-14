@@ -8,8 +8,10 @@
     <div class="p-4 sm:p-6">
         <!-- Assessment Form -->
         <form action="{{ route('assessments.storeAnswers', $assessment) }}" method="POST" enctype="multipart/form-data" 
-              x-data="assessmentForm({{ json_encode($sections->map(fn($s) => ['id' => $s->id, 'name' => $s->name])) }})">
+              x-data="assessmentForm({{ json_encode($sections->map(fn($s) => ['id' => $s->id, 'name' => $s->name])) }}, {{ json_encode($questionDependencyMap) }}, {{ json_encode($initialAnswerState) }})">
             @csrf
+                        <input type="hidden" name="submit_action" x-model="submitAction">
+                        <input type="hidden" name="save_item_id" x-model="saveItemId">
 
             <!-- Top Section: Filters/Progress and Information -->
             <div class="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -206,9 +208,12 @@
                                                     @endphp
                                                     
                                                     <div class="bg-neutral-50 rounded-xl p-5 border border-neutral-200 hover:border-primary-300 transition-colors"
+                                                         data-question-id="{{ $question->id }}"
                                                          x-data="{ hasAnswer: {{ $existingAnswer ? 'true' : 'false' }} }"
-                                                         @change="hasAnswer = true; $root.updateProgress()"
-                                                         @input.debounce.500ms="$root.updateProgress()">
+                                                         x-show="isQuestionVisible('{{ $question->id }}')"
+                                                         x-transition
+                                                         @change="hasAnswer = true; updateProgress()"
+                                                         @input.debounce.500ms="updateProgress()">
                                                         <!-- Question Header -->
                                                         <div class="flex items-start justify-between mb-4">
                                                             <div class="flex-1">
@@ -317,6 +322,7 @@
                                                                                value="{{ $option->id }}"
                                                                                {{ old($fieldName . '.option_id', $existingAnswer->option_id ?? '') == $option->id ? 'checked' : '' }}
                                                                                class="w-4 h-4 text-primary-600 border-neutral-300 focus:ring-primary-500"
+                                                                               @change="setSingleAnswer('{{ $question->id }}', $event.target.value)"
                                                                                {{ $question->is_required ? 'required' : '' }}
                                                                                {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'disabled' : '' }}>
                                                                         <span class="ml-3 text-sm text-neutral-800">
@@ -339,6 +345,7 @@
                                                                                value="{{ $option->id }}"
                                                                                {{ is_array(old($fieldName . '.option_ids', $existingAnswer->selected_options ?? [])) && in_array($option->id, old($fieldName . '.option_ids', $existingAnswer->selected_options ?? [])) ? 'checked' : '' }}
                                                                                class="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
+                                                                               @change="setMultiAnswer('{{ $question->id }}', '{{ $option->id }}', $event.target.checked)"
                                                                                {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'disabled' : '' }}>
                                                                         <span class="ml-3 text-sm text-neutral-800">
                                                                             {{ $option->option_text }}
@@ -365,48 +372,59 @@
                                                         No questions available for this item
                                                     </p>
                                                 @endforelse
+                                            </div>
 
-                                                <!-- Supporting Documents Upload (Item Level) -->
-                                                <div class="mt-6 pt-6 border-t-2 border-primary-200 bg-gradient-to-r from-primary-50 to-white rounded-xl p-5">
-                                                    <label class="block text-base font-bold text-primary-900 mb-3">
-                                                        <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <!-- Supporting Documents — one per item -->
+                                            <div class="px-5 pb-5">
+                                                <div class="border border-neutral-200 rounded-xl p-4 bg-neutral-50">
+                                                    <label class="block text-sm font-semibold text-neutral-700 mb-3">
+                                                        <svg class="w-4 h-4 inline mr-1 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
                                                         </svg>
-                                                        Supporting Documents For This Item (Optional)
+                                                        Supporting Documents
+                                                        <span class="text-neutral-400 font-normal text-xs ml-1">(Optional — applies to this item)</span>
                                                     </label>
 
-                                                    <input type="file"
-                                                           name="item_documents[{{ $item->id }}][]"
-                                                           multiple
-                                                           accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-                                                           class="w-full px-4 py-3 border border-primary-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'bg-neutral-50 cursor-not-allowed' : '' }}"
-                                                           {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'disabled' : '' }}>
+                                                    @unless($assessment->status === 'approved' || $assessment->status === 'in_review')
+                                                        <input type="file"
+                                                               name="item_documents[{{ $item->id }}][]"
+                                                               multiple
+                                                               accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                                               class="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm">
+                                                        <p class="mt-1 text-xs text-neutral-500">Accepted: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG &mdash; Max 10 MB per file</p>
+                                                    @endunless
 
-                                                    <p class="mt-2 text-xs text-neutral-600">
-                                                        Accepted formats: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (Max 10MB per file)
-                                                    </p>
-
-                                                    @if($item->supportingDocuments && $item->supportingDocuments->count() > 0)
-                                                        <div class="mt-4 space-y-2">
-                                                            <p class="text-xs font-semibold text-neutral-700">Uploaded Documents:</p>
+                                                    @if($item->supportingDocuments->count() > 0)
+                                                        <div class="mt-3 space-y-2">
+                                                            <p class="text-xs font-medium text-neutral-600">Uploaded Documents:</p>
                                                             @foreach($item->supportingDocuments as $doc)
-                                                                <div class="flex items-center justify-between p-3 bg-white border border-primary-200 rounded-lg">
-                                                                    <div class="flex items-center flex-1 min-w-0 mr-3">
-                                                                        <svg class="w-4 h-4 text-primary-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                                <div class="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded">
+                                                                    <div class="flex items-center flex-1 min-w-0">
+                                                                        <svg class="w-4 h-4 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                                                             <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd"/>
                                                                         </svg>
-                                                                        <span class="ml-2 text-xs text-neutral-800 truncate">{{ $doc->original_name }}</span>
+                                                                        <span class="ml-2 text-xs text-neutral-700 truncate">{{ $doc->original_name }}</span>
                                                                         <span class="ml-2 text-xs text-neutral-500">({{ $doc->formatted_size }})</span>
                                                                     </div>
                                                                     <a href="{{ $doc->file_url }}"
                                                                        target="_blank"
-                                                                       class="px-2 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors flex-shrink-0">
+                                                                       class="ml-2 px-2 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors flex-shrink-0">
                                                                         View
                                                                     </a>
                                                                 </div>
                                                             @endforeach
                                                         </div>
                                                     @endif
+
+                                                    @unless($assessment->status === 'approved' || $assessment->status === 'in_review')
+                                                        <div class="mt-4 flex justify-end">
+                                                            <button type="button"
+                                                                    @click="saveItem('{{ $item->id }}')"
+                                                                    class="px-4 py-2 text-sm bg-white text-primary-600 border border-primary-600 rounded-lg hover:bg-primary-50 transition-colors font-medium">
+                                                                Save This Item
+                                                            </button>
+                                                        </div>
+                                                    @endunless
                                                 </div>
                                             </div>
                                         </div>
@@ -444,14 +462,7 @@
                     </a>
                     @if($assessment->status !== 'approved' && $assessment->status !== 'in_review')
                         <button type="submit"
-                                name="submit_action"
-                                value="save"
-                                class="px-6 py-2.5 bg-white text-primary-600 border border-primary-600 rounded-lg hover:bg-primary-50 transition-colors font-medium">
-                            Save Answers
-                        </button>
-                        <button type="submit"
-                                name="submit_action"
-                                value="submit"
+                                @click="submitAction = 'submit'; saveItemId = ''"
                                 class="btn-primary"
                                 onclick="return confirm('Are you sure you want to submit this assessment for review? You will not be able to edit it after submission.')">
                             <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -471,68 +482,126 @@
 
     @push('scripts')
     <script>
-        function assessmentForm(sections) {
+        function assessmentForm(sections, questionDependencyMap, initialAnswerState) {
             return {
                 availableSections: sections,
                 selectedSection: '',
                 totalQuestions: 0,
                 answeredCount: 0,
                 progressPercentage: 0,
-                
+                submitAction: 'save',
+                saveItemId: '',
+                questionRules: questionDependencyMap || {},
+                answerState: initialAnswerState || {},
+
                 init() {
-                    this.calculateProgress();
-                    // Listen for input changes
+                    this.$nextTick(() => this.calculateProgress());
                     this.$watch('selectedSection', () => {
                         this.$nextTick(() => this.calculateProgress());
                     });
                 },
-                
+
+                /**
+                 * Returns true if the question should be visible.
+                 * A question with no dependency is always visible.
+                 * A question with a dependency is visible only when its parent
+                 * question is itself visible AND the required option is selected.
+                 */
+                isQuestionVisible(questionId, trail = []) {
+                    const id = String(questionId);
+                    const rule = this.questionRules[id];
+                    if (!rule || !rule.depends_on_question_id) return true;
+
+                    // Cycle guard
+                    if (trail.includes(id)) return true;
+
+                    const parentId = String(rule.depends_on_question_id);
+                    const requiredOptionId = String(rule.depends_on_option_id);
+
+                    // Parent must also be visible
+                    if (!this.isQuestionVisible(parentId, [...trail, id])) return false;
+
+                    const parentRule = this.questionRules[parentId];
+                    if (!parentRule) return false;
+
+                    const state = this.answerState[parentId];
+                    if (!state) return false;
+
+                    if (parentRule.question_type_id === 2) {
+                        // MCQ (single select)
+                        return String(state.selectedOptionId) === requiredOptionId;
+                    } else if (parentRule.question_type_id === 3) {
+                        // Multiple select
+                        return (state.selectedOptionIds || []).map(String).includes(requiredOptionId);
+                    }
+
+                    return false;
+                },
+
+                setSingleAnswer(questionId, optionId) {
+                    const key = String(questionId);
+                    const current = this.answerState[key] || { selectedOptionId: null, selectedOptionIds: [] };
+                    this.answerState[key] = { ...current, selectedOptionId: parseInt(optionId) };
+                    this.$nextTick(() => this.calculateProgress());
+                },
+
+                setMultiAnswer(questionId, optionId, checked) {
+                    const key = String(questionId);
+                    const current = this.answerState[key] || { selectedOptionId: null, selectedOptionIds: [] };
+                    const id = parseInt(optionId);
+                    const ids = [...(current.selectedOptionIds || [])];
+                    if (checked && !ids.includes(id)) {
+                        ids.push(id);
+                    } else if (!checked) {
+                        const idx = ids.indexOf(id);
+                        if (idx > -1) ids.splice(idx, 1);
+                    }
+                    this.answerState[key] = { ...current, selectedOptionIds: ids };
+                    this.$nextTick(() => this.calculateProgress());
+                },
+
+                saveItem(itemId) {
+                    this.submitAction = 'save';
+                    this.saveItemId = String(itemId);
+                    // Use native submit to bypass required-field checks for unrelated items.
+                    this.$el.submit();
+                },
+
                 calculateProgress() {
-                    // Count all questions
-                    const allQuestions = document.querySelectorAll('[x-data*="hasAnswer"]');
-                    this.totalQuestions = allQuestions.length;
-                    
-                    // Count answered questions
-                    this.answeredCount = 0;
-                    allQuestions.forEach(question => {
-                        // Check if question has any input with value
-                        const inputs = question.querySelectorAll('input[type="number"], input[type="radio"]:checked, input[type="checkbox"]:checked');
+                    const allQuestions = document.querySelectorAll('[data-question-id]');
+                    let total = 0;
+                    let answered = 0;
+
+                    allQuestions.forEach(questionEl => {
+                        const qId = questionEl.getAttribute('data-question-id');
+                        // Skip questions hidden by dependency
+                        if (!this.isQuestionVisible(qId)) return;
+
+                        total++;
+
+                        const inputs = questionEl.querySelectorAll('input[type="number"], input[type="radio"]:checked, input[type="checkbox"]:checked');
                         const hasValue = Array.from(inputs).some(input => {
                             if (input.type === 'radio' || input.type === 'checkbox') {
                                 return input.checked;
                             }
                             return input.value && input.value.trim() !== '';
                         });
-                        
-                        if (hasValue) {
-                            this.answeredCount++;
-                        }
+
+                        if (hasValue) answered++;
                     });
-                    
-                    this.progressPercentage = this.totalQuestions > 0 
-                        ? Math.round((this.answeredCount / this.totalQuestions) * 100)
+
+                    this.totalQuestions = total;
+                    this.answeredCount = answered;
+                    this.progressPercentage = total > 0
+                        ? Math.round((answered / total) * 100)
                         : 0;
                 },
-                
+
                 updateProgress() {
                     setTimeout(() => this.calculateProgress(), 100);
                 }
-            }
+            };
         }
-        
-        // Update progress on any input change
-        document.addEventListener('alpine:initialized', () => {
-            document.addEventListener('input', () => {
-                // Trigger progress recalculation
-                const event = new CustomEvent('progress-update');
-                document.dispatchEvent(event);
-            });
-            
-            document.addEventListener('change', () => {
-                const event = new CustomEvent('progress-update');
-                document.dispatchEvent(event);
-            });
-        });
     </script>
     @endpush
 </x-app-layout>

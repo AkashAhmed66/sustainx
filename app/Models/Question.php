@@ -13,6 +13,8 @@ class Question extends Model
         'item_id',
         'question_text',
         'question_type_id',
+        'depends_on_question_id',
+        'depends_on_option_id',
         'input_unit',
         'output_unit',
         'is_required',
@@ -38,6 +40,30 @@ class Question extends Model
     public function questionType()
     {
         return $this->belongsTo(QuestionType::class);
+    }
+
+    /**
+     * Get the parent question that controls visibility of this question.
+     */
+    public function dependsOnQuestion()
+    {
+        return $this->belongsTo(Question::class, 'depends_on_question_id');
+    }
+
+    /**
+     * Get the parent option that controls visibility of this question.
+     */
+    public function dependsOnOption()
+    {
+        return $this->belongsTo(Option::class, 'depends_on_option_id');
+    }
+
+    /**
+     * Get questions that depend on this question.
+     */
+    public function dependentQuestions()
+    {
+        return $this->hasMany(Question::class, 'depends_on_question_id');
     }
 
     /**
