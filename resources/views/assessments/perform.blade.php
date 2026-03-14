@@ -353,51 +353,6 @@
                                                             </div>
                                                         @endif
 
-                                                        <!-- Supporting Documents Upload -->
-                                                        <div class="mt-4 pt-4 border-t border-neutral-200">
-                                                            <label class="block text-sm font-medium text-neutral-700 mb-2">
-                                                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
-                                                                </svg>
-                                                                Supporting Documents (Optional)
-                                                            </label>
-                                                            <input type="file" 
-                                                                   name="{{ $fieldName }}[documents][]"
-                                                                   multiple
-                                                                   accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-                                                                   class="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'bg-neutral-50 cursor-not-allowed' : '' }}"
-                                                                   {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'disabled' : '' }}>
-                                                            <p class="mt-1 text-xs text-neutral-500">
-                                                                Accepted formats: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (Max 10MB per file)
-                                                            </p>
-                                                            
-                                                            @php
-                                                                $existingDocs = $existingAnswer?->supportingDocuments ?? collect();
-                                                            @endphp
-                                                            
-                                                            @if($existingDocs->count() > 0)
-                                                                <div class="mt-3 space-y-2">
-                                                                    <p class="text-xs font-medium text-neutral-600">Uploaded Documents:</p>
-                                                                    @foreach($existingDocs as $doc)
-                                                                        <div class="flex items-center justify-between p-2 bg-green-50 border border-green-200 rounded">
-                                                                            <div class="flex items-center flex-1 min-w-0">
-                                                                                <svg class="w-4 h-4 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                                                                    <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd"/>
-                                                                                </svg>
-                                                                                <span class="ml-2 text-xs text-neutral-700 truncate">{{ $doc->original_name }}</span>
-                                                                                <span class="ml-2 text-xs text-neutral-500">({{ $doc->formatted_size }})</span>
-                                                                            </div>
-                                                                            <a href="{{ $doc->file_url }}" 
-                                                                               target="_blank"
-                                                                               class="ml-2 px-2 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors flex-shrink-0">
-                                                                                View
-                                                                            </a>
-                                                                        </div>
-                                                                    @endforeach
-                                                                </div>
-                                                            @endif
-                                                        </div>
-
                                                         @error($fieldName . '.value')
                                                             <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                                                         @enderror
@@ -410,6 +365,49 @@
                                                         No questions available for this item
                                                     </p>
                                                 @endforelse
+
+                                                <!-- Supporting Documents Upload (Item Level) -->
+                                                <div class="mt-6 pt-6 border-t-2 border-primary-200 bg-gradient-to-r from-primary-50 to-white rounded-xl p-5">
+                                                    <label class="block text-base font-bold text-primary-900 mb-3">
+                                                        <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                                                        </svg>
+                                                        Supporting Documents For This Item (Optional)
+                                                    </label>
+
+                                                    <input type="file"
+                                                           name="item_documents[{{ $item->id }}][]"
+                                                           multiple
+                                                           accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                                           class="w-full px-4 py-3 border border-primary-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'bg-neutral-50 cursor-not-allowed' : '' }}"
+                                                           {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'disabled' : '' }}>
+
+                                                    <p class="mt-2 text-xs text-neutral-600">
+                                                        Accepted formats: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (Max 10MB per file)
+                                                    </p>
+
+                                                    @if($item->supportingDocuments && $item->supportingDocuments->count() > 0)
+                                                        <div class="mt-4 space-y-2">
+                                                            <p class="text-xs font-semibold text-neutral-700">Uploaded Documents:</p>
+                                                            @foreach($item->supportingDocuments as $doc)
+                                                                <div class="flex items-center justify-between p-3 bg-white border border-primary-200 rounded-lg">
+                                                                    <div class="flex items-center flex-1 min-w-0 mr-3">
+                                                                        <svg class="w-4 h-4 text-primary-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                                            <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd"/>
+                                                                        </svg>
+                                                                        <span class="ml-2 text-xs text-neutral-800 truncate">{{ $doc->original_name }}</span>
+                                                                        <span class="ml-2 text-xs text-neutral-500">({{ $doc->formatted_size }})</span>
+                                                                    </div>
+                                                                    <a href="{{ $doc->file_url }}"
+                                                                       target="_blank"
+                                                                       class="px-2 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors flex-shrink-0">
+                                                                        View
+                                                                    </a>
+                                                                </div>
+                                                            @endforeach
+                                                        </div>
+                                                    @endif
+                                                </div>
                                             </div>
                                         </div>
                                     @empty

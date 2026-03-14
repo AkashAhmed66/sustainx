@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Answer;
 use App\Models\Assessment;
 use App\Models\Factory;
+use App\Models\Item;
 use App\Models\Question;
 use App\Models\Section;
 use App\Models\SupportingDocument;
@@ -14,7 +15,6 @@ use App\Notifications\AssessmentApprovedNotification;
 use App\Notifications\AssessmentRejectedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Notification;
 
 class AssessmentController extends Controller
@@ -113,16 +113,22 @@ class AssessmentController extends Controller
             'factory.country',
             'answers.question.item.subsection.section',
             'answers.question.questionType',
-            'answers.option',
-            'answers.supportingDocuments'
+            'answers.option'
         ]);
 
         // Get all sections with their hierarchy for this assessment
         $sections = Section::with([
-            'subsections.items.questions' => function($query) {
-                $query->where('is_active', true)
-                      ->with('questionType', 'options');
-            }
+            'subsections.items' => function ($query) use ($assessment) {
+                $query->with([
+                    'questions' => function ($questionQuery) {
+                        $questionQuery->where('is_active', true)
+                            ->with('questionType', 'options');
+                    },
+                    'supportingDocuments' => function ($docQuery) use ($assessment) {
+                        $docQuery->where('assessment_id', $assessment->id);
+                    },
+                ]);
+            },
         ])->get();
 
         // Get existing answers for this assessment
@@ -201,20 +207,26 @@ class AssessmentController extends Controller
         $assessment->load([
             'factory.country',
             'answers.question',
-            'answers.option',
-            'answers.supportingDocuments'
+            'answers.option'
         ]);
 
         // Get all sections with active questions
         $sections = Section::with([
-            'subsections.items.questions' => function($query) {
-                $query->where('is_active', true)
-                      ->with(['questionType', 'options' => function($q) {
-                          $q->orderBy('order_no');
-                      }, 'equation.factors' => function($q) {
-                          $q->orderBy('sn');
-                      }]);
-            }
+            'subsections.items' => function ($query) use ($assessment) {
+                $query->with([
+                    'questions' => function ($questionQuery) {
+                        $questionQuery->where('is_active', true)
+                            ->with(['questionType', 'options' => function($q) {
+                                $q->orderBy('order_no');
+                            }, 'equation.factors' => function($q) {
+                                $q->orderBy('sn');
+                            }]);
+                    },
+                    'supportingDocuments' => function ($docQuery) use ($assessment) {
+                        $docQuery->where('assessment_id', $assessment->id);
+                    },
+                ]);
+            },
         ])->where('is_active', true)
           ->orderBy('order_no')
           ->get();
@@ -238,19 +250,17 @@ class AssessmentController extends Controller
             'answers.*.option_id' => 'nullable|exists:options,id',
             'answers.*.option_ids' => 'nullable|array',
             'answers.*.option_ids.*' => 'exists:options,id',
-            'answers.*.documents.*' => 'nullable|file|max:10240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', // 10MB max
+            'item_documents' => 'nullable|array',
+            'item_documents.*' => 'nullable|array',
+            'item_documents.*.*' => 'nullable|file|max:10240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', // 10MB max
             'submit_action' => 'nullable|in:save,submit',
         ]);
 
         DB::beginTransaction();
         try {
-            foreach ($validated['answers'] as $answerIndex => $answerData) {
+            foreach ($validated['answers'] as $answerData) {
                 if (empty($answerData['value']) && empty($answerData['option_id']) && empty($answerData['option_ids'])) {
-                    // Still process if there are documents but no answer value
-                    $hasDocuments = $request->hasFile("answers.{$answerIndex}.documents");
-                    if (!$hasDocuments) {
-                        continue; // Skip if no answer and no documents
-                    }
+                    continue;
                 }
 
                 // Get the question to determine type
@@ -321,43 +331,58 @@ class AssessmentController extends Controller
                 }
 
                 // Update or create answer
-                $answer = Answer::updateOrCreate(
+                Answer::updateOrCreate(
                     [
                         'assessment_id' => $assessment->id,
                         'question_id' => $answerData['question_id'],
                     ],
                     $dataToSave
                 );
+            }
 
-                // Handle file uploads for this question
-                if ($request->hasFile("answers.{$answerIndex}.documents")) {
-                    $files = $request->file("answers.{$answerIndex}.documents");
-                    
-                    foreach ($files as $file) {
-                        // Generate unique filename
-                        $originalName = $file->getClientOriginalName();
-                        $fileName = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-                        
-                        // Store file in storage/app/supporting_documents/{assessment_id}/{question_id}
-                        $filePath = $file->storeAs(
-                            "supporting_documents/{$assessment->id}/{$question->id}",
-                            $fileName,
-                            'public'
-                        );
+            // Handle file uploads per item
+            foreach ($request->file('item_documents', []) as $itemId => $files) {
+                if (!is_numeric($itemId)) {
+                    continue;
+                }
 
-                        // Create document record
-                        SupportingDocument::create([
-                            'assessment_id' => $assessment->id,
-                            'question_id' => $question->id,
-                            'answer_id' => $answer->id,
-                            'file_name' => $fileName,
-                            'file_path' => $filePath,
-                            'original_name' => $originalName,
-                            'file_size' => $file->getSize(),
-                            'mime_type' => $file->getMimeType(),
-                            'uploaded_by' => auth()->id(),
-                        ]);
-                    }
+                $itemId = (int) $itemId;
+                if (!Item::whereKey($itemId)->exists()) {
+                    continue;
+                }
+
+                $files = is_array($files) ? $files : [$files];
+                if (count($files) === 0) {
+                    continue;
+                }
+
+                // Replace existing item documents when new files are uploaded.
+                SupportingDocument::where('assessment_id', $assessment->id)
+                    ->where('item_id', $itemId)
+                    ->get()
+                    ->each
+                    ->delete();
+
+                foreach ($files as $file) {
+                    $originalName = $file->getClientOriginalName();
+                    $fileName = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+
+                    $filePath = $file->storeAs(
+                        "supporting_documents/{$assessment->id}/item_{$itemId}",
+                        $fileName,
+                        'public'
+                    );
+
+                    SupportingDocument::create([
+                        'assessment_id' => $assessment->id,
+                        'item_id' => $itemId,
+                        'file_name' => $fileName,
+                        'file_path' => $filePath,
+                        'original_name' => $originalName,
+                        'file_size' => $file->getSize(),
+                        'mime_type' => $file->getMimeType(),
+                        'uploaded_by' => auth()->id(),
+                    ]);
                 }
             }
 

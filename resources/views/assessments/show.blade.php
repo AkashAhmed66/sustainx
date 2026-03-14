@@ -238,48 +238,6 @@
                                                                         </svg>
                                                                         Updated: {{ $answer->updated_at->format('M d, Y H:i') }}
                                                                     </p>
-
-                                                                    <!-- Supporting Documents -->
-                                                                    @if($answer->supportingDocuments && $answer->supportingDocuments->count() > 0)
-                                                                        <div class="mt-3 pt-3 border-t border-neutral-200">
-                                                                            <p class="text-xs font-bold text-neutral-700 mb-2 flex items-center uppercase tracking-wide">
-                                                                                <svg class="w-4 h-4 mr-1.5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
-                                                                                </svg>
-                                                                                Documents ({{ $answer->supportingDocuments->count() }})
-                                                                            </p>
-                                                                            <div class="space-y-2">
-                                                                                @foreach($answer->supportingDocuments as $doc)
-                                                                                    <div class="flex items-center justify-between p-3 bg-gradient-to-r from-primary-50 to-white border border-primary-200 rounded-lg hover:border-primary-300 transition-colors">
-                                                                                        <div class="flex items-center flex-1 min-w-0 mr-3">
-                                                                                            <div class="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
-                                                                                                <svg class="w-4 h-4 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
-                                                                                                    <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd"/>
-                                                                                                </svg>
-                                                                                            </div>
-                                                                                            <div class="ml-3 flex-1 min-w-0">
-                                                                                                <p class="text-sm text-neutral-800 font-semibold truncate">{{ $doc->original_name }}</p>
-                                                                                                <p class="text-xs text-neutral-500 flex items-center mt-0.5">
-                                                                                                    <span>{{ $doc->formatted_size }}</span>
-                                                                                                    <span class="mx-1.5">•</span>
-                                                                                                    <span>{{ $doc->created_at->format('M d, Y') }}</span>
-                                                                                                </p>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                        <a href="{{ $doc->file_url }}" 
-                                                                                           target="_blank"
-                                                                                           download="{{ $doc->original_name }}"
-                                                                                           class="px-4 py-2 text-xs bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex-shrink-0 inline-flex items-center font-semibold shadow-sm hover:shadow-md">
-                                                                                            <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                                                                                            </svg>
-                                                                                            Download
-                                                                                        </a>
-                                                                                    </div>
-                                                                                @endforeach
-                                                                            </div>
-                                                                        </div>
-                                                                    @endif
                                                                 </div>
                                                             @else
                                                                 <div class="mt-3 pt-3 border-t-2 border-neutral-200 bg-neutral-50 rounded-lg p-3">
@@ -297,6 +255,48 @@
                                             @empty
                                                 <p class="text-sm text-neutral-500 italic p-4 bg-neutral-50 rounded-lg border border-neutral-200">No questions available</p>
                                             @endforelse
+
+                                            <!-- Supporting Documents (Item Level) -->
+                                            @if($item->supportingDocuments && $item->supportingDocuments->count() > 0)
+                                                <div class="mt-4 pt-4 border-t-2 border-primary-200">
+                                                    <p class="text-xs font-bold text-neutral-700 mb-2 flex items-center uppercase tracking-wide">
+                                                        <svg class="w-4 h-4 mr-1.5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                                                        </svg>
+                                                        Item Documents ({{ $item->supportingDocuments->count() }})
+                                                    </p>
+                                                    <div class="space-y-2">
+                                                        @foreach($item->supportingDocuments as $doc)
+                                                            <div class="flex items-center justify-between p-3 bg-gradient-to-r from-primary-50 to-white border border-primary-200 rounded-lg hover:border-primary-300 transition-colors">
+                                                                <div class="flex items-center flex-1 min-w-0 mr-3">
+                                                                    <div class="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
+                                                                        <svg class="w-4 h-4 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
+                                                                            <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd"/>
+                                                                        </svg>
+                                                                    </div>
+                                                                    <div class="ml-3 flex-1 min-w-0">
+                                                                        <p class="text-sm text-neutral-800 font-semibold truncate">{{ $doc->original_name }}</p>
+                                                                        <p class="text-xs text-neutral-500 flex items-center mt-0.5">
+                                                                            <span>{{ $doc->formatted_size }}</span>
+                                                                            <span class="mx-1.5">•</span>
+                                                                            <span>{{ $doc->created_at->format('M d, Y') }}</span>
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                                <a href="{{ $doc->file_url }}"
+                                                                   target="_blank"
+                                                                   download="{{ $doc->original_name }}"
+                                                                   class="px-4 py-2 text-xs bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex-shrink-0 inline-flex items-center font-semibold shadow-sm hover:shadow-md">
+                                                                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                                                    </svg>
+                                                                    Download
+                                                                </a>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
                                         </div>
                                     </div>
                                 @empty

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Subsection extends Model
 {
@@ -52,7 +53,7 @@ class Subsection extends Model
     public function getImageUrlAttribute()
     {
         if ($this->image_path) {
-            return \Storage::url($this->image_path);
+            return Storage::url($this->image_path);
         }
         return null;
     }
@@ -63,8 +64,8 @@ class Subsection extends Model
     protected static function booted()
     {
         static::deleted(function ($subsection) {
-            if ($subsection->image_path && \Storage::exists($subsection->image_path)) {
-                \Storage::delete($subsection->image_path);
+            if ($subsection->image_path && Storage::exists($subsection->image_path)) {
+                Storage::delete($subsection->image_path);
             }
         });
     }

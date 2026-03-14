@@ -12,8 +12,7 @@ class SupportingDocument extends Model
 
     protected $fillable = [
         'assessment_id',
-        'question_id',
-        'answer_id',
+        'item_id',
         'file_name',
         'file_path',
         'original_name',
@@ -31,19 +30,11 @@ class SupportingDocument extends Model
     }
 
     /**
-     * Get the question that owns the document.
+     * Get the item that owns the document.
      */
-    public function question()
+    public function item()
     {
-        return $this->belongsTo(Question::class);
-    }
-
-    /**
-     * Get the answer that owns the document.
-     */
-    public function answer()
-    {
-        return $this->belongsTo(Answer::class);
+        return $this->belongsTo(Item::class);
     }
 
     /**

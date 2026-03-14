@@ -58,11 +58,4 @@ class Answer extends Model
         return $this->belongsTo(Option::class);
     }
 
-    /**
-     * Get the supporting documents for this answer.
-     */
-    public function supportingDocuments()
-    {
-        return $this->hasMany(SupportingDocument::class);
-    }
 }

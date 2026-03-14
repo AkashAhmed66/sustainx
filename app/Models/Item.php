@@ -46,6 +46,14 @@ class Item extends Model
     }
 
     /**
+     * Get the supporting documents for this item.
+     */
+    public function supportingDocuments()
+    {
+        return $this->hasMany(SupportingDocument::class);
+    }
+
+    /**
      * Get the calculation results for the item.
      */
     public function calculationResults()

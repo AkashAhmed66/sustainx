@@ -72,11 +72,4 @@ class Question extends Model
         return $this->hasMany(CalculationResult::class);
     }
 
-    /**
-     * Get the supporting documents for the question.
-     */
-    public function supportingDocuments()
-    {
-        return $this->hasMany(SupportingDocument::class);
-    }
 }
