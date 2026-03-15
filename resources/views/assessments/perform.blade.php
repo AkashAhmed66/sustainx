@@ -241,7 +241,7 @@
                                                             </div>
                                                             <div class="ml-3 flex flex-col items-end space-y-2">
                                                                 <span class="px-3 py-1 text-xs rounded-lg bg-neutral-200 text-neutral-700 font-semibold whitespace-nowrap">
-                                                                    {{ ucfirst($question->questionType->name ?? 'N/A') }}
+                                                                    {{ ucwords(str_replace('_', ' ', $question->questionType->name ?? 'N/A')) }}
                                                                 </span>
                                                                 <span x-show="hasAnswer" 
                                                                       class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-semibold flex items-center">
@@ -253,119 +253,169 @@
                                                             </div>
                                                         </div>
 
-                                                        <!-- Hidden fields -->
-                                                        <input type="hidden" name="{{ $fieldName }}[question_id]" value="{{ $question->id }}">
-                                                        <input type="hidden" name="{{ $fieldName }}[item_id]" value="{{ $item->id }}">
+                                                        @if($question->question_type_id == 4)
+                                                            <div class="space-y-2">
+                                                                @forelse($question->childQuestions as $childIndex => $childQuestion)
+                                                                    @php
+                                                                        $existingChildAnswer = $existingAnswers[$childQuestion->id] ?? null;
+                                                                        $childFieldName = "answers[{$sectionIndex}_{$subsectionIndex}_{$itemIndex}_{$questionIndex}_{$childIndex}]";
+                                                                    @endphp
 
-                                                        <!-- Numeric Question Type -->
-                                                        @if($question->question_type_id == 1)
-                                                            <div>
-                                                                <input type="number" 
-                                                                       name="{{ $fieldName }}[value]"
-                                                                       step="any"
-                                                                       value="{{ old($fieldName . '.value', $existingAnswer->actual_answer ?? $existingAnswer->numeric_value ?? '') }}"
-                                                                       class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'bg-neutral-50 cursor-not-allowed' : '' }}"
-                                                                       placeholder="Enter numeric value"
-                                                                       {{ $question->is_required ? 'required' : '' }}
-                                                                       {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'readonly' : '' }}>
-                                                                
-                                                                @if($existingAnswer && $question->equation && $question->equation->factors->count() > 0)
-                                                                    <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                                                        <p class="text-xs font-medium text-green-800 mb-1">
-                                                                            <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                                                                            </svg>
-                                                                            Saved Answer
-                                                                        </p>
-                                                                        <div class="text-xs text-green-700 space-y-1">
-                                                                            <p><strong>Actual Answer (Your Input):</strong> {{ number_format($existingAnswer->actual_answer, 4) }} {{ $question->output_unit }}</p>
-                                                                            <p><strong>Calculated Answer:</strong> {{ number_format($existingAnswer->numeric_value, 4) }} {{ $question->output_unit }}</p>
+                                                                    <div class="rounded-lg border border-neutral-200 bg-white p-3">
+                                                                        <input type="hidden" name="{{ $childFieldName }}[question_id]" value="{{ $childQuestion->id }}">
+                                                                        <input type="hidden" name="{{ $childFieldName }}[item_id]" value="{{ $item->id }}">
+
+                                                                        <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                                                                            <div class="flex items-center flex-1 min-w-0">
+                                                                                <p class="text-sm font-medium text-neutral-800 truncate">{{ $childQuestion->question_text }}</p>
+                                                                                <span class="hidden sm:block mx-3 flex-1 border-t border-dashed border-neutral-300"></span>
+                                                                            </div>
+
+                                                                            <div class="w-full sm:w-56">
+                                                                                <input type="number"
+                                                                                       name="{{ $childFieldName }}[value]"
+                                                                                       step="any"
+                                                                                       value="{{ old($childFieldName . '.value', $existingChildAnswer->actual_answer ?? $existingChildAnswer->numeric_value ?? '') }}"
+                                                                                       class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'bg-neutral-50 cursor-not-allowed' : '' }}"
+                                                                                       placeholder="Value"
+                                                                                       {{ $childQuestion->is_required ? 'required' : '' }}
+                                                                                       {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'readonly' : '' }}>
+                                                                            </div>
                                                                         </div>
+
+                                                                        @if($childQuestion->input_unit)
+                                                                            <p class="mt-1 text-xs text-neutral-500">Input Unit: {{ $childQuestion->input_unit }}</p>
+                                                                        @endif
+
+                                                                        @if($childQuestion->equation && $childQuestion->equation->factors->count() > 0)
+                                                                            <p class="mt-2 text-xs text-blue-700">
+                                                                                Calculation: {{ $childQuestion->equation->name }}
+                                                                            </p>
+                                                                        @endif
+
+                                                                        @error($childFieldName . '.value')
+                                                                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                                                                        @enderror
                                                                     </div>
-                                                                @endif
-                                                                
-                                                                @if($question->equation && $question->equation->factors->count() > 0)
-                                                                    <div class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                                                        <p class="text-xs font-medium text-blue-800 mb-1">
-                                                                            <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                                                                            </svg>
-                                                                            Calculation: {{ $question->equation->name }}
-                                                                        </p>
-                                                                        <p class="text-xs text-blue-700">
-                                                                            Your input will be calculated using: 
-                                                                            @foreach($question->equation->factors as $factor)
-                                                                                @if($loop->first) Input @endif
-                                                                                @switch($factor->operation)
-                                                                                    @case('multiply') × @break
-                                                                                    @case('add') + @break
-                                                                                    @case('subtract') - @break
-                                                                                    @case('divide') ÷ @break
-                                                                                @endswitch
-                                                                                {{ $factor->factor_value }}
-                                                                                @if($factor->country)
-                                                                                    <span class="text-blue-600">({{ $factor->country->name }})</span>
+                                                                @empty
+                                                                    <p class="text-sm text-neutral-400 italic">No child questions configured for this mother question.</p>
+                                                                @endforelse
+                                                            </div>
+                                                        @else
+                                                            <!-- Hidden fields -->
+                                                            <input type="hidden" name="{{ $fieldName }}[question_id]" value="{{ $question->id }}">
+                                                            <input type="hidden" name="{{ $fieldName }}[item_id]" value="{{ $item->id }}">
+
+                                                            <!-- Numeric Question Type -->
+                                                            @if($question->question_type_id == 1)
+                                                                <div>
+                                                                    <input type="number" 
+                                                                           name="{{ $fieldName }}[value]"
+                                                                           step="any"
+                                                                           value="{{ old($fieldName . '.value', $existingAnswer->actual_answer ?? $existingAnswer->numeric_value ?? '') }}"
+                                                                           class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'bg-neutral-50 cursor-not-allowed' : '' }}"
+                                                                           placeholder="Enter numeric value"
+                                                                           {{ $question->is_required ? 'required' : '' }}
+                                                                           {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'readonly' : '' }}>
+                                                                    
+                                                                    @if($existingAnswer && $question->equation && $question->equation->factors->count() > 0)
+                                                                        <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                                                            <p class="text-xs font-medium text-green-800 mb-1">
+                                                                                <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                                                                </svg>
+                                                                                Saved Answer
+                                                                            </p>
+                                                                            <div class="text-xs text-green-700 space-y-1">
+                                                                                <p><strong>Actual Answer (Your Input):</strong> {{ number_format($existingAnswer->actual_answer, 4) }} {{ $question->output_unit }}</p>
+                                                                                <p><strong>Calculated Answer:</strong> {{ number_format($existingAnswer->numeric_value, 4) }} {{ $question->output_unit }}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    @endif
+                                                                    
+                                                                    @if($question->equation && $question->equation->factors->count() > 0)
+                                                                        <div class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                                                            <p class="text-xs font-medium text-blue-800 mb-1">
+                                                                                <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                                                                                </svg>
+                                                                                Calculation: {{ $question->equation->name }}
+                                                                            </p>
+                                                                            <p class="text-xs text-blue-700">
+                                                                                Your input will be calculated using: 
+                                                                                @foreach($question->equation->factors as $factor)
+                                                                                    @if($loop->first) Input @endif
+                                                                                    @switch($factor->operation)
+                                                                                        @case('multiply') × @break
+                                                                                        @case('add') + @break
+                                                                                        @case('subtract') - @break
+                                                                                        @case('divide') ÷ @break
+                                                                                    @endswitch
+                                                                                    {{ $factor->factor_value }}
+                                                                                    @if($factor->country)
+                                                                                        <span class="text-blue-600">({{ $factor->country->name }})</span>
+                                                                                    @endif
+                                                                                @endforeach
+                                                                            </p>
+                                                                        </div>
+                                                                    @endif
+                                                                </div>
+
+                                                            <!-- MCQ Question Type -->
+                                                            @elseif($question->question_type_id == 2)
+                                                                <div class="space-y-2">
+                                                                    @forelse($question->options as $option)
+                                                                        <label class="flex items-center p-3 border border-neutral-200 rounded-lg hover:bg-neutral-50 cursor-pointer transition-colors {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'opacity-60 cursor-not-allowed' : '' }}">
+                                                                            <input type="radio" 
+                                                                                   name="{{ $fieldName }}[option_id]"
+                                                                                   value="{{ $option->id }}"
+                                                                                   {{ old($fieldName . '.option_id', $existingAnswer->option_id ?? '') == $option->id ? 'checked' : '' }}
+                                                                                   class="w-4 h-4 text-primary-600 border-neutral-300 focus:ring-primary-500"
+                                                                                   @change="setSingleAnswer('{{ $question->id }}', $event.target.value)"
+                                                                                   {{ $question->is_required ? 'required' : '' }}
+                                                                                   {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'disabled' : '' }}>
+                                                                            <span class="ml-3 text-sm text-neutral-800">
+                                                                                {{ $option->option_text }}
+                                                                                @if($option->option_value !== null)
+                                                                                    <span class="text-neutral-500 ml-1">({{ $option->option_value }})</span>
                                                                                 @endif
-                                                                            @endforeach
-                                                                        </p>
-                                                                    </div>
-                                                                @endif
-                                                            </div>
+                                                                            </span>
+                                                                        </label>
+                                                                    @empty
+                                                                        <p class="text-sm text-neutral-400 italic">No options available</p>
+                                                                    @endforelse
+                                                                </div>
+                                                            @elseif($question->question_type_id == 3)
+                                                                <div class="space-y-2">
+                                                                    @forelse($question->options as $option)
+                                                                        <label class="flex items-center p-3 border border-neutral-200 rounded-lg hover:bg-neutral-50 cursor-pointer transition-colors {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'opacity-60 cursor-not-allowed' : '' }}">
+                                                                            <input type="checkbox" 
+                                                                                   name="{{ $fieldName }}[option_ids][]"
+                                                                                   value="{{ $option->id }}"
+                                                                                   {{ is_array(old($fieldName . '.option_ids', $existingAnswer->selected_options ?? [])) && in_array($option->id, old($fieldName . '.option_ids', $existingAnswer->selected_options ?? [])) ? 'checked' : '' }}
+                                                                                   class="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
+                                                                                   @change="setMultiAnswer('{{ $question->id }}', '{{ $option->id }}', $event.target.checked)"
+                                                                                   {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'disabled' : '' }}>
+                                                                            <span class="ml-3 text-sm text-neutral-800">
+                                                                                {{ $option->option_text }}
+                                                                                @if($option->option_value !== null)
+                                                                                    <span class="text-neutral-500 ml-1">({{ $option->option_value }})</span>
+                                                                                @endif
+                                                                            </span>
+                                                                        </label>
+                                                                    @empty
+                                                                        <p class="text-sm text-neutral-400 italic">No options available</p>
+                                                                    @endforelse
+                                                                </div>
+                                                            @endif
 
-                                                        <!-- MCQ Question Type -->
-                                                        @elseif($question->question_type_id == 2)
-                                                            <div class="space-y-2">
-                                                                @forelse($question->options as $option)
-                                                                    <label class="flex items-center p-3 border border-neutral-200 rounded-lg hover:bg-neutral-50 cursor-pointer transition-colors {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'opacity-60 cursor-not-allowed' : '' }}">
-                                                                        <input type="radio" 
-                                                                               name="{{ $fieldName }}[option_id]"
-                                                                               value="{{ $option->id }}"
-                                                                               {{ old($fieldName . '.option_id', $existingAnswer->option_id ?? '') == $option->id ? 'checked' : '' }}
-                                                                               class="w-4 h-4 text-primary-600 border-neutral-300 focus:ring-primary-500"
-                                                                               @change="setSingleAnswer('{{ $question->id }}', $event.target.value)"
-                                                                               {{ $question->is_required ? 'required' : '' }}
-                                                                               {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'disabled' : '' }}>
-                                                                        <span class="ml-3 text-sm text-neutral-800">
-                                                                            {{ $option->option_text }}
-                                                                            @if($option->option_value !== null)
-                                                                                <span class="text-neutral-500 ml-1">({{ $option->option_value }})</span>
-                                                                            @endif
-                                                                        </span>
-                                                                    </label>
-                                                                @empty
-                                                                    <p class="text-sm text-neutral-400 italic">No options available</p>
-                                                                @endforelse
-                                                            </div>
-                                                        @elseif($question->question_type_id == 3)
-                                                            <div class="space-y-2">
-                                                                @forelse($question->options as $option)
-                                                                    <label class="flex items-center p-3 border border-neutral-200 rounded-lg hover:bg-neutral-50 cursor-pointer transition-colors {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'opacity-60 cursor-not-allowed' : '' }}">
-                                                                        <input type="checkbox" 
-                                                                               name="{{ $fieldName }}[option_ids][]"
-                                                                               value="{{ $option->id }}"
-                                                                               {{ is_array(old($fieldName . '.option_ids', $existingAnswer->selected_options ?? [])) && in_array($option->id, old($fieldName . '.option_ids', $existingAnswer->selected_options ?? [])) ? 'checked' : '' }}
-                                                                               class="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
-                                                                               @change="setMultiAnswer('{{ $question->id }}', '{{ $option->id }}', $event.target.checked)"
-                                                                               {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'disabled' : '' }}>
-                                                                        <span class="ml-3 text-sm text-neutral-800">
-                                                                            {{ $option->option_text }}
-                                                                            @if($option->option_value !== null)
-                                                                                <span class="text-neutral-500 ml-1">({{ $option->option_value }})</span>
-                                                                            @endif
-                                                                        </span>
-                                                                    </label>
-                                                                @empty
-                                                                    <p class="text-sm text-neutral-400 italic">No options available</p>
-                                                                @endforelse
-                                                            </div>
+                                                            @error($fieldName . '.value')
+                                                                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                                                            @enderror
+                                                            @error($fieldName . '.option_id')
+                                                                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                                                            @enderror
                                                         @endif
-
-                                                        @error($fieldName . '.value')
-                                                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                                                        @enderror
-                                                        @error($fieldName . '.option_id')
-                                                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                                                        @enderror
                                                     </div>
                                                 @empty
                                                     <p class="text-sm text-neutral-400 italic ml-8 py-4 bg-neutral-50 rounded-lg px-4 border border-neutral-200">
@@ -510,10 +560,18 @@
                 isQuestionVisible(questionId, trail = []) {
                     const id = String(questionId);
                     const rule = this.questionRules[id];
-                    if (!rule || !rule.depends_on_question_id) return true;
+                    if (!rule) return true;
 
                     // Cycle guard
                     if (trail.includes(id)) return true;
+
+                    // Child questions inherit mother visibility.
+                    if (rule.parent_question_id) {
+                        const motherId = String(rule.parent_question_id);
+                        if (!this.isQuestionVisible(motherId, [...trail, id])) return false;
+                    }
+
+                    if (!rule.depends_on_question_id || !rule.depends_on_option_id) return true;
 
                     const parentId = String(rule.depends_on_question_id);
                     const requiredOptionId = String(rule.depends_on_option_id);
@@ -576,6 +634,13 @@
                         const qId = questionEl.getAttribute('data-question-id');
                         // Skip questions hidden by dependency
                         if (!this.isQuestionVisible(qId)) return;
+
+                         // Skip elements currently hidden by x-show/section filtering.
+                        if (questionEl.offsetParent === null) return;
+
+                        // Ignore wrappers that have no answer controls.
+                        const answerInputs = questionEl.querySelectorAll('input[type="number"], input[type="radio"], input[type="checkbox"]');
+                        if (answerInputs.length === 0) return;
 
                         total++;
 

@@ -11,6 +11,8 @@ class Question extends Model
 
     protected $fillable = [
         'item_id',
+        'parent_question_id',
+        'child_order_no',
         'question_text',
         'question_type_id',
         'depends_on_question_id',
@@ -22,6 +24,7 @@ class Question extends Model
     ];
 
     protected $casts = [
+        'child_order_no' => 'integer',
         'is_required' => 'boolean',
         'is_active' => 'boolean',
     ];
@@ -40,6 +43,24 @@ class Question extends Model
     public function questionType()
     {
         return $this->belongsTo(QuestionType::class);
+    }
+
+    /**
+     * Get the mother/parent question for child rows.
+     */
+    public function parentQuestion()
+    {
+        return $this->belongsTo(Question::class, 'parent_question_id');
+    }
+
+    /**
+     * Get all child questions under a mother question.
+     */
+    public function childQuestions()
+    {
+        return $this->hasMany(Question::class, 'parent_question_id')
+            ->orderBy('child_order_no')
+            ->orderBy('id');
     }
 
     /**

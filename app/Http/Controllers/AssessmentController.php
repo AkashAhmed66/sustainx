@@ -124,7 +124,17 @@ class AssessmentController extends Controller
                 $query->with([
                     'questions' => function ($questionQuery) {
                         $questionQuery->where('is_active', true)
-                            ->with('questionType', 'options');
+                            ->whereNull('parent_question_id')
+                            ->with([
+                                'questionType',
+                                'options',
+                                'childQuestions' => function ($childQuery) {
+                                    $childQuery->where('is_active', true)
+                                        ->orderBy('child_order_no')
+                                        ->orderBy('id')
+                                        ->with(['questionType', 'equation.factors']);
+                                },
+                            ]);
                     },
                     'supportingDocuments' => function ($docQuery) use ($assessment) {
                         $docQuery->where('assessment_id', $assessment->id);
@@ -218,11 +228,27 @@ class AssessmentController extends Controller
                 $query->with([
                     'questions' => function ($questionQuery) {
                         $questionQuery->where('is_active', true)
-                            ->with(['questionType', 'options' => function($q) {
-                                $q->orderBy('order_no');
-                            }, 'equation.factors' => function($q) {
-                                $q->orderBy('sn');
-                            }]);
+                            ->whereNull('parent_question_id')
+                            ->with([
+                                'questionType',
+                                'options' => function($q) {
+                                    $q->orderBy('order_no');
+                                },
+                                'equation.factors' => function($q) {
+                                    $q->orderBy('sn');
+                                },
+                                'childQuestions' => function ($childQuery) {
+                                    $childQuery->where('is_active', true)
+                                        ->orderBy('child_order_no')
+                                        ->orderBy('id')
+                                        ->with([
+                                            'questionType',
+                                            'equation.factors' => function ($q) {
+                                                $q->orderBy('sn');
+                                            },
+                                        ]);
+                                },
+                            ]);
                     },
                     'supportingDocuments' => function ($docQuery) use ($assessment) {
                         $docQuery->where('assessment_id', $assessment->id);
@@ -245,6 +271,7 @@ class AssessmentController extends Controller
                     foreach ($item->questions as $question) {
                         $questionDependencyMap[$question->id] = [
                             'question_type_id' => (int) $question->question_type_id,
+                            'parent_question_id' => $question->parent_question_id ? (int) $question->parent_question_id : null,
                             'depends_on_question_id' => $question->depends_on_question_id ? (int) $question->depends_on_question_id : null,
                             'depends_on_option_id' => $question->depends_on_option_id ? (int) $question->depends_on_option_id : null,
                         ];
@@ -254,6 +281,21 @@ class AssessmentController extends Controller
                             'selectedOptionId' => $existingAnswer?->option_id ? (int) $existingAnswer->option_id : null,
                             'selectedOptionIds' => array_map('intval', $existingAnswer?->selected_options ?? []),
                         ];
+
+                        foreach ($question->childQuestions as $childQuestion) {
+                            $questionDependencyMap[$childQuestion->id] = [
+                                'question_type_id' => (int) $childQuestion->question_type_id,
+                                'parent_question_id' => $childQuestion->parent_question_id ? (int) $childQuestion->parent_question_id : null,
+                                'depends_on_question_id' => $childQuestion->depends_on_question_id ? (int) $childQuestion->depends_on_question_id : null,
+                                'depends_on_option_id' => $childQuestion->depends_on_option_id ? (int) $childQuestion->depends_on_option_id : null,
+                            ];
+
+                            $childExistingAnswer = $existingAnswers->get($childQuestion->id);
+                            $initialAnswerState[$childQuestion->id] = [
+                                'selectedOptionId' => $childExistingAnswer?->option_id ? (int) $childExistingAnswer->option_id : null,
+                                'selectedOptionIds' => array_map('intval', $childExistingAnswer?->selected_options ?? []),
+                            ];
+                        }
                     }
                 }
             }
@@ -586,6 +628,22 @@ class AssessmentController extends Controller
 
         $dependsOnQuestionId = $question->depends_on_question_id ? (int) $question->depends_on_question_id : null;
         $dependsOnOptionId = $question->depends_on_option_id ? (int) $question->depends_on_option_id : null;
+
+        $parentQuestionId = $question->parent_question_id ? (int) $question->parent_question_id : null;
+        if ($parentQuestionId) {
+            $parentVisible = $this->isQuestionVisibleForSubmission(
+                $parentQuestionId,
+                $questions,
+                $submittedAnswerState,
+                $memo,
+                [...$trail, $questionId]
+            );
+
+            if (!$parentVisible) {
+                $memo[$questionId] = false;
+                return false;
+            }
+        }
 
         if (!$dependsOnQuestionId || !$dependsOnOptionId) {
             $memo[$questionId] = true;

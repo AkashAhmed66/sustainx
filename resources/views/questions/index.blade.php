@@ -38,7 +38,7 @@
                     @elseif($key === 'question_type')
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-neutral-100 text-neutral-800">
-                                {{ ucfirst($item->questionType->name ?? '-') }}
+                                {{ ucwords(str_replace('_', ' ', $item->questionType->name ?? '-')) }}
                             </span>
                         </td>
                     @elseif($key === 'input_unit')

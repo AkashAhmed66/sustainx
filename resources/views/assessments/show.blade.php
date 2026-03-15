@@ -173,7 +173,7 @@
                                                                     @endif
                                                                 </p>
                                                                 <span class="ml-2 px-2.5 py-1 text-xs rounded-full font-semibold bg-primary-100 text-primary-700 flex-shrink-0">
-                                                                    {{ $question->questionType->name ?? 'N/A' }}
+                                                                    {{ ucwords(str_replace('_', ' ', $question->questionType->name ?? 'N/A')) }}
                                                                 </span>
                                                             </div>
 
@@ -187,7 +187,40 @@
                                                             @endif
 
                                                             <!-- Display Answer -->
-                                                            @if(isset($existingAnswers[$question->id]))
+                                                            @if($question->question_type_id == 4)
+                                                                <div class="mt-3 pt-3 border-t-2 border-primary-200 bg-white rounded-lg p-3 space-y-2">
+                                                                    @forelse($question->childQuestions as $childQuestion)
+                                                                        @php $childAnswer = $existingAnswers[$childQuestion->id] ?? null; @endphp
+                                                                        <div class="border border-neutral-200 rounded-lg p-3 bg-neutral-50">
+                                                                            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                                                                                <div class="flex items-center flex-1 min-w-0">
+                                                                                    <p class="text-sm text-neutral-800 font-medium truncate">{{ $childQuestion->question_text }}</p>
+                                                                                    <span class="hidden sm:block mx-3 flex-1 border-t border-dashed border-neutral-300"></span>
+                                                                                </div>
+
+                                                                                <div class="w-full sm:w-56">
+                                                                                    @if($childAnswer && $childAnswer->numeric_value !== null)
+                                                                                        <p class="text-base font-bold text-primary-700">
+                                                                                            {{ $childAnswer->numeric_value }}
+                                                                                            @if($childQuestion->output_unit)
+                                                                                                <span class="text-neutral-600 font-semibold">{{ $childQuestion->output_unit }}</span>
+                                                                                            @endif
+                                                                                        </p>
+                                                                                    @else
+                                                                                        <p class="text-xs text-neutral-400 italic">No answer</p>
+                                                                                    @endif
+                                                                                </div>
+                                                                            </div>
+
+                                                                            @if($childQuestion->input_unit)
+                                                                                <p class="mt-1 text-xs text-neutral-500">Input Unit: {{ $childQuestion->input_unit }}</p>
+                                                                            @endif
+                                                                        </div>
+                                                                    @empty
+                                                                        <p class="text-xs text-neutral-400 italic">No child questions configured.</p>
+                                                                    @endforelse
+                                                                </div>
+                                                            @elseif(isset($existingAnswers[$question->id]))
                                                                 @php $answer = $existingAnswers[$question->id]; @endphp
                                                                 <div class="mt-3 pt-3 border-t-2 border-primary-200 bg-white rounded-lg p-3">
                                                                     <div class="flex items-center justify-between mb-2">
