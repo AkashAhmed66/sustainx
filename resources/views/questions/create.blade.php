@@ -285,13 +285,8 @@
                         <!-- Multiple Numeric Child Questions -->
                         <div x-show="questionType == '4'">
                             <div class="border border-neutral-200 rounded-xl p-4 bg-neutral-50">
-                                <div class="flex items-center justify-between mb-4">
+                                <div class="mb-4">
                                     <h3 class="font-medium text-neutral-800">Child Questions (Numeric)</h3>
-                                    <button type="button"
-                                            @click="addChildQuestion()"
-                                            class="px-3 py-1.5 text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors font-medium text-sm">
-                                        + Add Child Question
-                                    </button>
                                 </div>
 
                                 @error('child_questions')
@@ -401,6 +396,14 @@
                                             </div>
                                         </div>
                                     </template>
+                                </div>
+
+                                <div class="mt-4 flex justify-end">
+                                    <button type="button"
+                                            @click="addChildQuestion()"
+                                            class="px-3 py-1.5 text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors font-medium text-sm">
+                                        + Add Child Question
+                                    </button>
                                 </div>
                             </div>
                         </div>

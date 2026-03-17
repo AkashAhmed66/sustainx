@@ -335,14 +335,7 @@ class AssessmentController extends Controller
             ->unique()
             ->values();
 
-        $questions = Question::with([
-                'questionType',
-                'equation.factors',
-                'options:id,question_id',
-            ])
-            ->whereIn('id', $questionIds)
-            ->get()
-            ->keyBy('id');
+        $questions = $this->loadQuestionsForSubmission($questionIds);
 
         $submittedAnswerState = $this->buildSubmittedAnswerState($answers->all(), $questions);
         $visibilityMemo = [];
@@ -506,6 +499,72 @@ class AssessmentController extends Controller
                 ->withInput()
                 ->with('error', 'Failed to save answers: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Load submitted questions plus their parent/dependency chain for visibility checks.
+     */
+    private function loadQuestionsForSubmission(Collection $submittedQuestionIds): Collection
+    {
+        $questions = Question::with([
+                'questionType',
+                'equation.factors',
+                'options:id,question_id',
+            ])
+            ->whereIn('id', $submittedQuestionIds->all())
+            ->get()
+            ->keyBy('id');
+
+        $pendingIds = $questions
+            ->flatMap(function (Question $question) {
+                return [
+                    $question->parent_question_id,
+                    $question->depends_on_question_id,
+                ];
+            })
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        while ($pendingIds->isNotEmpty()) {
+            $missingIds = $pendingIds
+                ->filter(fn ($id) => !$questions->has((int) $id))
+                ->values();
+
+            if ($missingIds->isEmpty()) {
+                break;
+            }
+
+            $additionalQuestions = Question::with([
+                    'options:id,question_id',
+                ])
+                ->whereIn('id', $missingIds->all())
+                ->get()
+                ->keyBy('id');
+
+            if ($additionalQuestions->isEmpty()) {
+                break;
+            }
+
+            foreach ($additionalQuestions as $id => $question) {
+                $questions->put((int) $id, $question);
+            }
+
+            $pendingIds = $additionalQuestions
+                ->flatMap(function (Question $question) {
+                    return [
+                        $question->parent_question_id,
+                        $question->depends_on_question_id,
+                    ];
+                })
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+        }
+
+        return $questions;
     }
 
     /**
