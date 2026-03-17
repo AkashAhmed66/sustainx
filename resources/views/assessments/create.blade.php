@@ -80,7 +80,9 @@
                                     class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('status') border-red-500 @enderror">
                                 <option value="draft" {{ old('status', 'draft') == 'draft' ? 'selected' : '' }}>Draft</option>
                                 <option value="submitted" {{ old('status') == 'submitted' ? 'selected' : '' }}>Submitted</option>
+                                <option value="in_review" {{ old('status') == 'in_review' ? 'selected' : '' }}>In Review</option>
                                 <option value="approved" {{ old('status') == 'approved' ? 'selected' : '' }}>Approved</option>
+                                <option value="rejected" {{ old('status') == 'rejected' ? 'selected' : '' }}>Rejected</option>
                             </select>
                             @error('status')
                                 <p class="mt-2 text-sm text-red-600">{{ $message }}</p>

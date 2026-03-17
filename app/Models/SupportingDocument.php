@@ -12,6 +12,7 @@ class SupportingDocument extends Model
 
     protected $fillable = [
         'assessment_id',
+        'question_id',
         'item_id',
         'subsection_id',
         'file_name',
@@ -28,6 +29,14 @@ class SupportingDocument extends Model
     public function assessment()
     {
         return $this->belongsTo(Assessment::class);
+    }
+
+    /**
+     * Get the question entity that owns the document.
+     */
+    public function question()
+    {
+        return $this->belongsTo(Question::class);
     }
 
     /**
@@ -59,7 +68,7 @@ class SupportingDocument extends Model
      */
     public function getFileUrlAttribute()
     {
-        return Storage::url($this->file_path);
+        return asset('storage/' . ltrim($this->file_path, '/'));
     }
 
     /**
@@ -83,8 +92,8 @@ class SupportingDocument extends Model
     protected static function booted()
     {
         static::deleted(function ($document) {
-            if (Storage::exists($document->file_path)) {
-                Storage::delete($document->file_path);
+            if (Storage::disk('public')->exists($document->file_path)) {
+                Storage::disk('public')->delete($document->file_path);
             }
         });
     }

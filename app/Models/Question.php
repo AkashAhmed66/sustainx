@@ -123,6 +123,14 @@ class Question extends Model
     }
 
     /**
+     * Get supporting documents uploaded for this question entity.
+     */
+    public function supportingDocuments()
+    {
+        return $this->hasMany(SupportingDocument::class)->orderByDesc('created_at');
+    }
+
+    /**
      * Get the calculation results for the question.
      */
     public function calculationResults()

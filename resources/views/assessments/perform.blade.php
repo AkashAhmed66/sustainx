@@ -4,11 +4,11 @@
     </x-slot>
 
     <div class="p-4 sm:p-6">
-        <form action="{{ route('assessments.storeAnswers', $assessment) }}" method="POST"
+                <form action="{{ route('assessments.storeAnswers', $assessment) }}" method="POST" enctype="multipart/form-data"
               x-data="assessmentForm({{ json_encode($sections->map(fn($s) => ['id' => $s->id, 'name' => $s->name])) }}, {{ json_encode($questionDependencyMap) }}, {{ json_encode($initialAnswerState) }})">
             @csrf
             <input type="hidden" name="submit_action" x-model="submitAction">
-            <input type="hidden" name="save_subsection_id" x-model="saveSubsectionId">
+                        <input type="hidden" name="save_question_id" x-model="saveQuestionId">
 
             <div class="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div class="space-y-4">
@@ -91,6 +91,7 @@
                                     @if($assessment->status === 'approved') bg-green-100 text-green-800
                                     @elseif($assessment->status === 'in_review') bg-blue-100 text-blue-800
                                     @elseif($assessment->status === 'submitted') bg-indigo-100 text-indigo-800
+                                    @elseif($assessment->status === 'rejected') bg-red-100 text-red-800
                                     @else bg-yellow-100 text-yellow-800
                                     @endif">
                                     {{ $assessment->status === 'in_review' ? 'In Review' : ucfirst(str_replace('_', ' ', $assessment->status)) }}
@@ -131,151 +132,27 @@
                                     </div>
 
                                     <div class="space-y-4">
-                                        @forelse($subsection->questions as $questionIndex => $question)
-                                            @php
-                                                $existingAnswer = $existingAnswers[$question->id] ?? null;
-                                                $fieldName = "answers[{$sectionIndex}_{$subsectionIndex}_{$questionIndex}]";
-                                            @endphp
-
-                                            <div class="bg-neutral-50 rounded-xl p-5 border border-neutral-200 hover:border-primary-300 transition-colors"
-                                                 data-question-id="{{ $question->id }}"
-                                                 x-data="{ hasAnswer: {{ $existingAnswer ? 'true' : 'false' }} }"
-                                                 x-show="isQuestionVisible('{{ $question->id }}')"
-                                                 x-transition
-                                                 @change="hasAnswer = true; updateProgress()"
-                                                 @input.debounce.500ms="updateProgress()">
-
-                                                <div class="flex items-start justify-between mb-4">
-                                                    <div class="flex-1">
-                                                        <label class="text-sm text-neutral-900 font-semibold flex items-start">
-                                                            <span class="w-6 h-6 bg-neutral-200 rounded-full flex items-center justify-center text-xs font-bold text-neutral-700 mr-2 flex-shrink-0 mt-0.5">
-                                                                {{ $questionIndex + 1 }}
-                                                            </span>
-                                                            <span class="flex-1">
-                                                                {{ $question->question_text }}
-                                                                @if($question->is_required)
-                                                                    <span class="text-red-500 ml-1">*</span>
-                                                                @endif
-                                                            </span>
-                                                        </label>
-                                                        @if($question->input_unit)
-                                                            <div class="ml-8 mt-2">
-                                                                <span class="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-bold border border-blue-200">
-                                                                    Unit: {{ $question->input_unit }}
-                                                                </span>
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                    <div class="ml-3 flex flex-col items-end space-y-2">
-                                                        <span class="px-3 py-1 text-xs rounded-lg bg-neutral-200 text-neutral-700 font-semibold whitespace-nowrap">
-                                                            {{ ucwords(str_replace('_', ' ', $question->questionType->name ?? 'N/A')) }}
-                                                        </span>
-                                                        <span x-show="hasAnswer" class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-semibold">Answered</span>
-                                                    </div>
-                                                </div>
-
-                                                @if($question->question_type_id == 4)
-                                                    <div class="space-y-2">
-                                                        @forelse($question->childQuestions as $childIndex => $childQuestion)
-                                                            @php
-                                                                $existingChildAnswer = $existingAnswers[$childQuestion->id] ?? null;
-                                                                $childFieldName = "answers[{$sectionIndex}_{$subsectionIndex}_{$questionIndex}_{$childIndex}]";
-                                                            @endphp
-                                                            <div class="rounded-lg border border-neutral-200 bg-white p-3">
-                                                                <input type="hidden" name="{{ $childFieldName }}[question_id]" value="{{ $childQuestion->id }}">
-                                                                <input type="hidden" name="{{ $childFieldName }}[subsection_id]" value="{{ $subsection->id }}">
-
-                                                                <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                                                                    <div class="flex items-center flex-1 min-w-0">
-                                                                        <p class="text-sm font-medium text-neutral-800 truncate">{{ $childQuestion->question_text }}</p>
-                                                                        <span class="hidden sm:block mx-3 flex-1 border-t border-dashed border-neutral-300"></span>
-                                                                    </div>
-                                                                    <div class="w-full sm:w-56">
-                                                                        <input type="number"
-                                                                               name="{{ $childFieldName }}[value]"
-                                                                               step="any"
-                                                                               value="{{ old($childFieldName . '.value', $existingChildAnswer->actual_answer ?? $existingChildAnswer->numeric_value ?? '') }}"
-                                                                               class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'bg-neutral-50 cursor-not-allowed' : '' }}"
-                                                                               placeholder="Value"
-                                                                               {{ $childQuestion->is_required ? 'required' : '' }}
-                                                                               {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'readonly' : '' }}>
-                                                                    </div>
-                                                                </div>
-                                                                @if($childQuestion->input_unit)
-                                                                    <p class="mt-1 text-xs text-neutral-500">Input Unit: {{ $childQuestion->input_unit }}</p>
-                                                                @endif
-                                                            </div>
-                                                        @empty
-                                                            <p class="text-sm text-neutral-400 italic">No child questions configured for this question.</p>
-                                                        @endforelse
-                                                    </div>
-                                                @else
-                                                    <input type="hidden" name="{{ $fieldName }}[question_id]" value="{{ $question->id }}">
-                                                    <input type="hidden" name="{{ $fieldName }}[subsection_id]" value="{{ $subsection->id }}">
-
-                                                    @if($question->question_type_id == 1)
-                                                        <div>
-                                                            <input type="number"
-                                                                   name="{{ $fieldName }}[value]"
-                                                                   step="any"
-                                                                   value="{{ old($fieldName . '.value', $existingAnswer->actual_answer ?? $existingAnswer->numeric_value ?? '') }}"
-                                                                   class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'bg-neutral-50 cursor-not-allowed' : '' }}"
-                                                                   placeholder="Enter numeric value"
-                                                                   {{ $question->is_required ? 'required' : '' }}
-                                                                   {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'readonly' : '' }}>
-                                                        </div>
-                                                    @elseif($question->question_type_id == 2)
-                                                        <div class="space-y-2">
-                                                            @forelse($question->options as $option)
-                                                                <label class="flex items-center p-3 border border-neutral-200 rounded-lg hover:bg-neutral-50 cursor-pointer transition-colors {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'opacity-60 cursor-not-allowed' : '' }}">
-                                                                    <input type="radio"
-                                                                           name="{{ $fieldName }}[option_id]"
-                                                                           value="{{ $option->id }}"
-                                                                           {{ old($fieldName . '.option_id', $existingAnswer->option_id ?? '') == $option->id ? 'checked' : '' }}
-                                                                           class="w-4 h-4 text-primary-600 border-neutral-300 focus:ring-primary-500"
-                                                                           @change="setSingleAnswer('{{ $question->id }}', $event.target.value)"
-                                                                           {{ $question->is_required ? 'required' : '' }}
-                                                                           {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'disabled' : '' }}>
-                                                                    <span class="ml-3 text-sm text-neutral-800">{{ $option->option_text }}</span>
-                                                                </label>
-                                                            @empty
-                                                                <p class="text-sm text-neutral-400 italic">No options available</p>
-                                                            @endforelse
-                                                        </div>
-                                                    @elseif($question->question_type_id == 3)
-                                                        <div class="space-y-2">
-                                                            @forelse($question->options as $option)
-                                                                <label class="flex items-center p-3 border border-neutral-200 rounded-lg hover:bg-neutral-50 cursor-pointer transition-colors {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'opacity-60 cursor-not-allowed' : '' }}">
-                                                                    <input type="checkbox"
-                                                                           name="{{ $fieldName }}[option_ids][]"
-                                                                           value="{{ $option->id }}"
-                                                                           {{ is_array(old($fieldName . '.option_ids', $existingAnswer->selected_options ?? [])) && in_array($option->id, old($fieldName . '.option_ids', $existingAnswer->selected_options ?? [])) ? 'checked' : '' }}
-                                                                           class="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
-                                                                           @change="setMultiAnswer('{{ $question->id }}', '{{ $option->id }}', $event.target.checked)"
-                                                                           {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'disabled' : '' }}>
-                                                                    <span class="ml-3 text-sm text-neutral-800">{{ $option->option_text }}</span>
-                                                                </label>
-                                                            @empty
-                                                                <p class="text-sm text-neutral-400 italic">No options available</p>
-                                                            @endforelse
-                                                        </div>
-                                                    @endif
-                                                @endif
-                                            </div>
+                                        @php
+                                            $rootQuestions = $subsection->questions->whereNull('depends_on_question_id')->values();
+                                        @endphp
+                                        @forelse($rootQuestions as $questionIndex => $question)
+                                            @include('assessments.perform-question', [
+                                                'question' => $question,
+                                                'questions' => $subsection->questions,
+                                                'subsection' => $subsection,
+                                                'assessment' => $assessment,
+                                                'existingAnswers' => $existingAnswers,
+                                                'supportingDocumentsByQuestion' => $supportingDocumentsByQuestion,
+                                                'questionKey' => $sectionIndex . '_' . $subsectionIndex . '_' . $questionIndex,
+                                                'displayIndex' => (string) ($questionIndex + 1),
+                                                'isRelated' => false,
+                                                'depth' => 0,
+                                            ])
                                         @empty
                                             <p class="text-sm text-neutral-400 italic ml-8 py-4 bg-neutral-50 rounded-lg px-4 border border-neutral-200">No questions available for this subsection</p>
                                         @endforelse
                                     </div>
 
-                                    @unless($assessment->status === 'approved' || $assessment->status === 'in_review')
-                                        <div class="mt-4 flex justify-end">
-                                            <button type="button"
-                                                    @click="saveSubsection('{{ $subsection->id }}')"
-                                                    class="px-4 py-2 text-sm bg-white text-primary-600 border border-primary-600 rounded-lg hover:bg-primary-50 transition-colors font-medium">
-                                                Save This Subsection
-                                            </button>
-                                        </div>
-                                    @endunless
                                 </div>
                             @empty
                                 <p class="text-sm text-neutral-400 italic py-4 bg-neutral-50 rounded-lg px-4 border border-neutral-200">No subsections available in this section</p>
@@ -299,12 +176,7 @@
                     </a>
                     @if($assessment->status !== 'approved' && $assessment->status !== 'in_review')
                         <button type="submit"
-                                @click="submitAction = 'save'; saveSubsectionId = ''"
-                                class="px-6 py-2.5 text-primary-700 bg-primary-50 border border-primary-300 rounded-lg hover:bg-primary-100 transition-colors font-medium">
-                            Save Progress
-                        </button>
-                        <button type="submit"
-                                @click="submitAction = 'submit'; saveSubsectionId = ''"
+                                @click="submitAction = 'submit'; saveQuestionId = ''"
                                 class="btn-primary"
                                 onclick="return confirm('Are you sure you want to submit this assessment for review? You will not be able to edit it after submission.')">
                             Submit for Review
@@ -329,7 +201,7 @@
                 answeredCount: 0,
                 progressPercentage: 0,
                 submitAction: 'save',
-                saveSubsectionId: '',
+                saveQuestionId: '',
                 questionRules: questionDependencyMap || {},
                 answerState: initialAnswerState || {},
 
@@ -396,12 +268,6 @@
                     }
                     this.answerState[key] = { ...current, selectedOptionIds: ids };
                     this.$nextTick(() => this.calculateProgress());
-                },
-
-                saveSubsection(subsectionId) {
-                    this.submitAction = 'save';
-                    this.saveSubsectionId = String(subsectionId);
-                    this.$el.submit();
                 },
 
                 calculateProgress() {

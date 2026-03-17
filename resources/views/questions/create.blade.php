@@ -567,7 +567,7 @@
                                 <input type="checkbox"
                                        name="is_required"
                                        value="1"
-                                       {{ old('is_required', true) ? 'checked' : '' }}
+                                       {{ old('is_required', false) ? 'checked' : '' }}
                                        class="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500">
                                 <span class="ml-2 text-sm font-medium text-neutral-700">Required</span>
                             </label>

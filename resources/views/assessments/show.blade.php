@@ -25,23 +25,86 @@
                 <div class="p-6">
                     <h3 class="text-base font-semibold text-neutral-800 mb-2">Review Required</h3>
                     <p class="text-sm text-neutral-600 mb-4">This assessment is awaiting your review.</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <form action="{{ route('assessments.reject', $assessment) }}" method="POST">
-                            @csrf
+
+                    @if($reviewDocuments->isNotEmpty())
+                        <div class="mb-4 space-y-2">
+                            @foreach($reviewDocuments as $document)
+                                <a href="{{ $document->file_url }}"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   class="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 px-3 py-2 hover:bg-neutral-50 transition-colors">
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-medium text-neutral-800 truncate">{{ $document->original_name }}</p>
+                                        <p class="text-xs text-neutral-500">{{ $document->formatted_size }} • {{ $document->uploader->name ?? 'Unknown user' }} • {{ $document->created_at->format('M d, Y H:i') }}</p>
+                                    </div>
+                                    <span class="text-xs font-medium text-primary-600 whitespace-nowrap">Open</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if($errors->has('review_documents') || $errors->has('review_documents.*'))
+                        <div class="mb-4 space-y-1">
+                            @error('review_documents')
+                                <p class="text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                            @foreach($errors->get('review_documents.*') as $errorGroup)
+                                @foreach($errorGroup as $errorMessage)
+                                    <p class="text-sm text-red-600">{{ $errorMessage }}</p>
+                                @endforeach
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <form method="POST" enctype="multipart/form-data" class="space-y-4">
+                        @csrf
+
+                        <div>
+                            <label class="block text-sm font-medium text-neutral-700 mb-2">Upload Review Files (Optional)</label>
+                            <input type="file"
+                                   name="review_documents[]"
+                                   multiple
+                                   accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png"
+                                   class="block w-full text-sm text-neutral-700 file:mr-4 file:rounded-lg file:border-0 file:bg-primary-50 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100">
+                            <p class="mt-2 text-xs text-neutral-500">Allowed: PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, JPEG, PNG. Max 10 MB each.</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <button type="submit"
+                                    formaction="{{ route('assessments.reject', $assessment) }}"
                                     onclick="return confirm('Are you sure you want to reject this assessment?')"
                                     class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-white text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition-colors font-medium">
                                 Reject
                             </button>
-                        </form>
-                        <form action="{{ route('assessments.approve', $assessment) }}" method="POST">
-                            @csrf
                             <button type="submit"
+                                    formaction="{{ route('assessments.approve', $assessment) }}"
                                     onclick="return confirm('Are you sure you want to approve this assessment?')"
                                     class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
                                 Approve
                             </button>
-                        </form>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
+
+        @if($reviewDocuments->isNotEmpty() && !($assessment->status === 'in_review' && auth()->user()->can('edit assessments')))
+            <div class="dashboard-card mb-6">
+                <div class="p-6">
+                    <h3 class="text-base font-semibold text-neutral-800 mb-3">Review Files</h3>
+                    <div class="space-y-2">
+                        @foreach($reviewDocuments as $document)
+                            <a href="{{ $document->file_url }}"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               class="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 px-3 py-2 hover:bg-neutral-50 transition-colors">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-medium text-neutral-800 truncate">{{ $document->original_name }}</p>
+                                    <p class="text-xs text-neutral-500">{{ $document->formatted_size }} • {{ $document->uploader->name ?? 'Unknown user' }} • {{ $document->created_at->format('M d, Y H:i') }}</p>
+                                </div>
+                                <span class="text-xs font-medium text-primary-600 whitespace-nowrap">Open</span>
+                            </a>
+                        @endforeach
                     </div>
                 </div>
             </div>
@@ -72,6 +135,7 @@
                             @if($assessment->status === 'approved') bg-green-100 text-green-800
                             @elseif($assessment->status === 'in_review') bg-blue-100 text-blue-800
                             @elseif($assessment->status === 'submitted') bg-indigo-100 text-indigo-800
+                            @elseif($assessment->status === 'rejected') bg-red-100 text-red-800
                             @else bg-yellow-100 text-yellow-800
                             @endif">
                             {{ $assessment->status === 'in_review' ? 'In Review' : ucfirst(str_replace('_', ' ', $assessment->status)) }}
@@ -99,93 +163,19 @@
                                 <h4 class="text-base font-semibold text-neutral-800 mb-4">{{ $subsection->name }}</h4>
 
                                 <div class="space-y-4">
-                                    @forelse($subsection->questions as $questionIndex => $question)
-                                        <div class="bg-neutral-50 rounded-lg p-4 border border-neutral-200">
-                                            <div class="flex items-start gap-3">
-                                                <div class="flex-shrink-0 w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
-                                                    <span class="text-white font-bold text-sm">{{ $questionIndex + 1 }}</span>
-                                                </div>
-
-                                                <div class="flex-1 min-w-0">
-                                                    <div class="flex items-start justify-between mb-2">
-                                                        <p class="text-sm text-neutral-800 font-medium flex-1">
-                                                            {{ $question->question_text }}
-                                                            @if($question->is_required)
-                                                                <span class="text-red-500">*</span>
-                                                            @endif
-                                                        </p>
-                                                        <span class="ml-2 px-2.5 py-1 text-xs rounded-full font-semibold bg-primary-100 text-primary-700 flex-shrink-0">
-                                                            {{ ucwords(str_replace('_', ' ', $question->questionType->name ?? 'N/A')) }}
-                                                        </span>
-                                                    </div>
-
-                                                    @if($question->output_unit)
-                                                        <p class="text-xs text-neutral-500 mb-2">Unit: {{ $question->output_unit }}</p>
-                                                    @endif
-
-                                                    @if($question->question_type_id == 4)
-                                                        <div class="mt-3 pt-3 border-t-2 border-primary-200 bg-white rounded-lg p-3 space-y-2">
-                                                            @forelse($question->childQuestions as $childQuestion)
-                                                                @php $childAnswer = $existingAnswers[$childQuestion->id] ?? null; @endphp
-                                                                <div class="border border-neutral-200 rounded-lg p-3 bg-neutral-50">
-                                                                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                                                                        <div class="flex items-center flex-1 min-w-0">
-                                                                            <p class="text-sm text-neutral-800 font-medium truncate">{{ $childQuestion->question_text }}</p>
-                                                                            <span class="hidden sm:block mx-3 flex-1 border-t border-dashed border-neutral-300"></span>
-                                                                        </div>
-
-                                                                        <div class="w-full sm:w-56">
-                                                                            @if($childAnswer && $childAnswer->numeric_value !== null)
-                                                                                <p class="text-base font-bold text-primary-700">
-                                                                                    {{ $childAnswer->numeric_value }}
-                                                                                    @if($childQuestion->output_unit)
-                                                                                        <span class="text-neutral-600 font-semibold">{{ $childQuestion->output_unit }}</span>
-                                                                                    @endif
-                                                                                </p>
-                                                                            @else
-                                                                                <p class="text-xs text-neutral-400 italic">No answer</p>
-                                                                            @endif
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            @empty
-                                                                <p class="text-xs text-neutral-400 italic">No child questions configured.</p>
-                                                            @endforelse
-                                                        </div>
-                                                    @elseif(isset($existingAnswers[$question->id]))
-                                                        @php $answer = $existingAnswers[$question->id]; @endphp
-                                                        <div class="mt-3 pt-3 border-t-2 border-primary-200 bg-white rounded-lg p-3">
-                                                            @if($answer->numeric_value !== null)
-                                                                <p class="text-base font-bold text-primary-700">
-                                                                    {{ $answer->numeric_value }}
-                                                                    @if($question->output_unit)
-                                                                        <span class="text-neutral-600 font-semibold">{{ $question->output_unit }}</span>
-                                                                    @endif
-                                                                </p>
-                                                            @elseif($answer->text_value)
-                                                                <p class="text-sm text-neutral-800 leading-relaxed">{{ $answer->text_value }}</p>
-                                                            @elseif($answer->selected_options && count($answer->selected_options) > 0)
-                                                                @php
-                                                                    $selectedOptions = $question->options->whereIn('id', $answer->selected_options);
-                                                                @endphp
-                                                                <div class="space-y-1.5">
-                                                                    @foreach($selectedOptions as $option)
-                                                                        <p class="text-sm text-neutral-800 font-medium">- {{ $option->option_text }}</p>
-                                                                    @endforeach
-                                                                </div>
-                                                            @elseif($answer->option)
-                                                                <p class="text-sm text-neutral-800 font-medium">{{ $answer->option->option_text }}</p>
-                                                            @endif
-                                                            <p class="text-xs text-neutral-400 mt-2">Updated: {{ $answer->updated_at->format('M d, Y H:i') }}</p>
-                                                        </div>
-                                                    @else
-                                                        <div class="mt-3 pt-3 border-t-2 border-neutral-200 bg-neutral-50 rounded-lg p-3">
-                                                            <p class="text-xs text-neutral-400 italic">No answer provided yet</p>
-                                                        </div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
+                                    @php
+                                        $rootQuestions = $subsection->questions->whereNull('depends_on_question_id')->values();
+                                    @endphp
+                                    @forelse($rootQuestions as $questionIndex => $question)
+                                        @include('assessments.show-question', [
+                                            'question' => $question,
+                                            'questions' => $subsection->questions,
+                                            'existingAnswers' => $existingAnswers,
+                                            'supportingDocumentsByQuestion' => $supportingDocumentsByQuestion,
+                                            'displayIndex' => (string) ($questionIndex + 1),
+                                            'isRelated' => false,
+                                            'depth' => 0,
+                                        ])
                                     @empty
                                         <p class="text-sm text-neutral-500 italic p-4 bg-neutral-50 rounded-lg border border-neutral-200">No questions available</p>
                                     @endforelse
