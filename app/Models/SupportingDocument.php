@@ -13,7 +13,8 @@ class SupportingDocument extends Model
     protected $fillable = [
         'assessment_id',
         'question_id',
-        'answer_id',
+        'item_id',
+        'subsection_id',
         'file_name',
         'file_path',
         'original_name',
@@ -31,7 +32,7 @@ class SupportingDocument extends Model
     }
 
     /**
-     * Get the question that owns the document.
+     * Get the question entity that owns the document.
      */
     public function question()
     {
@@ -39,11 +40,19 @@ class SupportingDocument extends Model
     }
 
     /**
-     * Get the answer that owns the document.
+     * Get the item that owns the document.
      */
-    public function answer()
+    public function item()
     {
-        return $this->belongsTo(Answer::class);
+        return $this->belongsTo(Item::class);
+    }
+
+    /**
+     * Get the subsection that owns the document.
+     */
+    public function subsection()
+    {
+        return $this->belongsTo(Subsection::class);
     }
 
     /**
@@ -59,7 +68,7 @@ class SupportingDocument extends Model
      */
     public function getFileUrlAttribute()
     {
-        return Storage::url($this->file_path);
+        return asset('storage/' . ltrim($this->file_path, '/'));
     }
 
     /**
@@ -83,8 +92,8 @@ class SupportingDocument extends Model
     protected static function booted()
     {
         static::deleted(function ($document) {
-            if (Storage::exists($document->file_path)) {
-                Storage::delete($document->file_path);
+            if (Storage::disk('public')->exists($document->file_path)) {
+                Storage::disk('public')->delete($document->file_path);
             }
         });
     }

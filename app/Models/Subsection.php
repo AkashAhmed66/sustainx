@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Subsection extends Model
 {
@@ -39,6 +40,14 @@ class Subsection extends Model
     }
 
     /**
+     * Get questions that belong directly to this subsection.
+     */
+    public function questions()
+    {
+        return $this->hasMany(Question::class)->orderBy('id');
+    }
+
+    /**
      * Get the images for this subsection.
      */
     public function images()
@@ -47,12 +56,20 @@ class Subsection extends Model
     }
 
     /**
+     * Get supporting documents uploaded for this subsection.
+     */
+    public function supportingDocuments()
+    {
+        return $this->hasMany(SupportingDocument::class)->orderByDesc('created_at');
+    }
+
+    /**
      * Get the image URL (for backward compatibility).
      */
     public function getImageUrlAttribute()
     {
         if ($this->image_path) {
-            return \Storage::url($this->image_path);
+            return Storage::url($this->image_path);
         }
         return null;
     }
@@ -63,8 +80,8 @@ class Subsection extends Model
     protected static function booted()
     {
         static::deleted(function ($subsection) {
-            if ($subsection->image_path && \Storage::exists($subsection->image_path)) {
-                \Storage::delete($subsection->image_path);
+            if ($subsection->image_path && Storage::exists($subsection->image_path)) {
+                Storage::delete($subsection->image_path);
             }
         });
     }

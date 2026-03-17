@@ -18,6 +18,7 @@ class QuestionTypeSeeder extends Seeder
             ['id' => 1, 'name' => 'numeric'],
             ['id' => 2, 'name' => 'mcq'],
             ['id' => 3, 'name' => 'multiple_select'],
+            ['id' => 4, 'name' => 'multiple_numeric'],
         ];
 
         foreach ($questionTypes as $type) {

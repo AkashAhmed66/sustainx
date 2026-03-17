@@ -12,7 +12,6 @@ class Answer extends Model
     protected $fillable = [
         'assessment_id',
         'question_id',
-        'item_id',
         'numeric_value',
         'actual_answer',
         'text_value',
@@ -58,11 +57,4 @@ class Answer extends Model
         return $this->belongsTo(Option::class);
     }
 
-    /**
-     * Get the supporting documents for this answer.
-     */
-    public function supportingDocuments()
-    {
-        return $this->hasMany(SupportingDocument::class);
-    }
 }

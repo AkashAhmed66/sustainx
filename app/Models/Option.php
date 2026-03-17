@@ -35,4 +35,12 @@ class Option extends Model
     {
         return $this->hasMany(Answer::class);
     }
+
+    /**
+     * Get questions that depend on this option.
+     */
+    public function dependentQuestions()
+    {
+        return $this->hasMany(Question::class, 'depends_on_option_id');
+    }
 }

@@ -31,14 +31,24 @@
                         <td class="px-6 py-4">
                             <div class="text-sm font-semibold text-neutral-900">{{ Str::limit($item->question_text, 60) }}</div>
                         </td>
-                    @elseif($key === 'item')
+                    @elseif($key === 'subsection')
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
-                            {{ $item->item->name ?? '-' }}
+                            @if($item->subsection)
+                                {{ $item->subsection->section->name ?? '-' }} -> {{ $item->subsection->name }}
+                            @else
+                                -
+                            @endif
                         </td>
                     @elseif($key === 'question_type')
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-neutral-100 text-neutral-800">
-                                {{ ucfirst($item->questionType->name ?? '-') }}
+                                {{ ucwords(str_replace('_', ' ', $item->questionType->name ?? '-')) }}
+                            </span>
+                        </td>
+                    @elseif($key === 'main_question')
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $item->is_main_question ? 'bg-blue-100 text-blue-800' : 'bg-neutral-100 text-neutral-800' }}">
+                                {{ $item->is_main_question ? 'Main' : 'No' }}
                             </span>
                         </td>
                     @elseif($key === 'input_unit')

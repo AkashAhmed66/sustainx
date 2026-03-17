@@ -1,21 +1,11 @@
+multiple numeric
 
 
-file per question
 
-item unit same *******
-
-dashboard charts and graph
-
-perform page more understandable
-
-multiple select
+in the question type there should be another question type multiple_numeric on on select on this the user can add multiple question under this question with the equation and factor section and the global equation and factor section would be removed and the, the output unit would be the same and there should be an option to add the input unit and these values should be saved in the in the question table itself and make the table changes if required to enable the connection i mean the mother question and the chield questions should be saved at the question table itself. and there should be connection to get the data in the perform table. please fix everything properly in the view file and in the perform blade the question should appear like
+mother question?
+chield question ---------- input field
+chield question ---------- input field
 
 
-input unit and output unit different
-
-
-metering at the perform page
-
-subsection image add
-
-comparison dashboard
+like this way please fix everything properly

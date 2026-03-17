@@ -11,9 +11,44 @@
                 <form action="{{ route('questions.store') }}" method="POST" 
                       x-data="{
                           questionType: '{{ old('question_type_id', '') }}',
+                          selectedSubsectionId: '{{ old('subsection_id', '') }}',
+                          triggerQuestions: {{ $triggerQuestionsJson }},
+                          triggerQuestionId: '{{ old('depends_on_question_id', '') }}',
+                          triggerOptionId: '{{ old('depends_on_option_id', '') }}',
                           options: {{ old('options') ? json_encode(old('options')) : $defaultOptions }},
                           factors: {{ old('factors') ? json_encode(old('factors')) : $defaultFactors }},
                           equationName: '{{ old('equation_name', '') }}',
+                          childQuestions: {{ old('child_questions') ? json_encode(array_values(old('child_questions'))) : $defaultChildQuestions }},
+                          get filteredTriggerQuestions() {
+                              if (!this.selectedSubsectionId) {
+                                  return [];
+                              }
+
+                              return this.triggerQuestions.filter((question) => String(question.subsection_id) === String(this.selectedSubsectionId));
+                          },
+                          get selectedTriggerQuestion() {
+                              return this.filteredTriggerQuestions.find((question) => String(question.id) === String(this.triggerQuestionId)) || null;
+                          },
+                          get availableTriggerOptions() {
+                              return this.selectedTriggerQuestion ? this.selectedTriggerQuestion.options : [];
+                          },
+                          syncDependencySelection() {
+                              const stillValidQuestion = this.filteredTriggerQuestions.some((question) => String(question.id) === String(this.triggerQuestionId));
+                              if (!stillValidQuestion) {
+                                  this.triggerQuestionId = '';
+                                  this.triggerOptionId = '';
+                                  return;
+                              }
+
+                              const stillValidOption = this.availableTriggerOptions.some((option) => String(option.id) === String(this.triggerOptionId));
+                              if (!stillValidOption) {
+                                  this.triggerOptionId = '';
+                              }
+                          },
+                          clearDependency() {
+                              this.triggerQuestionId = '';
+                              this.triggerOptionId = '';
+                          },
                           addOption() {
                               this.options.push({
                                   option_text: '',
@@ -42,28 +77,63 @@
                                   // Reorder
                                   this.factors.forEach((fac, idx) => fac.sn = idx + 1);
                               }
+                          },
+                          addChildQuestion() {
+                              this.childQuestions.push({
+                                  id: null,
+                                  question_text: '',
+                                  input_unit: '',
+                                  equation_name: '',
+                                  factors: [{ sn: 1, operation: 'multiply', factor_value: '', country_id: '' }]
+                              });
+                          },
+                          removeChildQuestion(index) {
+                              if (this.childQuestions.length > 1) {
+                                  this.childQuestions.splice(index, 1);
+                              }
+                          },
+                          addChildFactor(childIndex) {
+                              if (!this.childQuestions[childIndex].factors) {
+                                  this.childQuestions[childIndex].factors = [];
+                              }
+
+                              this.childQuestions[childIndex].factors.push({
+                                  sn: this.childQuestions[childIndex].factors.length + 1,
+                                  operation: 'multiply',
+                                  factor_value: '',
+                                  country_id: ''
+                              });
+                          },
+                          removeChildFactor(childIndex, factorIndex) {
+                              const factors = this.childQuestions[childIndex].factors || [];
+                              if (factors.length > 1) {
+                                  factors.splice(factorIndex, 1);
+                                  factors.forEach((factor, idx) => factor.sn = idx + 1);
+                              }
                           }
-                      }">
+                      }"
+                      x-effect="syncDependencySelection(); if (questionType == '4' && childQuestions.length === 0) { addChildQuestion(); }">
                     @csrf
 
                     <div class="grid grid-cols-1 gap-6 mb-6">
-                        <!-- Item -->
+                        <!-- Subsection -->
                         <div>
-                            <label for="item_id" class="block text-sm font-medium text-neutral-700 mb-2">
-                                Item <span class="text-red-500">*</span>
+                            <label for="subsection_id" class="block text-sm font-medium text-neutral-700 mb-2">
+                                Subsection <span class="text-red-500">*</span>
                             </label>
-                            <select name="item_id"
-                                    id="item_id"
+                            <select name="subsection_id"
+                                    id="subsection_id"
+                                    x-model="selectedSubsectionId"
                                     required
-                                    class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('item_id') border-red-500 @enderror">
-                                <option value="">Select Item</option>
-                                @foreach($items as $item)
-                                    <option value="{{ $item->id }}" {{ old('item_id') == $item->id ? 'selected' : '' }}>
-                                        {{ $item->subsection->section->name }} → {{ $item->subsection->name }} → {{ $item->name }}
+                                    class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('subsection_id') border-red-500 @enderror">
+                                <option value="">Select Subsection</option>
+                                @foreach($subsections as $subsection)
+                                    <option value="{{ $subsection->id }}" {{ old('subsection_id') == $subsection->id ? 'selected' : '' }}>
+                                        {{ $subsection->section->name }} → {{ $subsection->name }}
                                     </option>
                                 @endforeach
                             </select>
-                            @error('item_id')
+                            @error('subsection_id')
                                 <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
@@ -97,7 +167,7 @@
                                 <option value="">Select Type</option>
                                 @foreach($questionTypes as $type)
                                     <option value="{{ $type->id }}" {{ old('question_type_id') == $type->id ? 'selected' : '' }}>
-                                        {{ ucfirst($type->name) }}
+                                        {{ ucwords(str_replace('_', ' ', $type->name)) }}
                                     </option>
                                 @endforeach
                             </select>
@@ -106,8 +176,82 @@
                             @enderror
                         </div>
 
-                        <!-- Input Unit -->
+                        <!-- Conditional Dependency -->
+                        <div class="border border-neutral-200 rounded-xl p-4 bg-neutral-50">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-sm font-medium text-neutral-700">
+                                    Conditional Visibility <span class="text-neutral-500 text-xs">(Optional)</span>
+                                </label>
+                                <button type="button"
+                                        x-show="triggerQuestionId || triggerOptionId"
+                                        @click="clearDependency()"
+                                        class="text-xs px-2 py-1 rounded bg-neutral-200 text-neutral-700 hover:bg-neutral-300 transition-colors">
+                                    Clear
+                                </button>
+                            </div>
+
+                            <p class="text-xs text-neutral-600 mb-4">
+                                Show this question only when a specific option is selected in an existing MCQ/Multiple Select question from the same subsection.
+                            </p>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="depends_on_question_id" class="block text-sm font-medium text-neutral-700 mb-2">
+                                        Existing Question
+                                    </label>
+                                    <select name="depends_on_question_id"
+                                            id="depends_on_question_id"
+                                            x-model="triggerQuestionId"
+                                            class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('depends_on_question_id') border-red-500 @enderror">
+                                        <option value="">Always visible (no dependency)</option>
+                                        <template x-for="triggerQuestion in filteredTriggerQuestions" :key="triggerQuestion.id">
+                                            <option :value="triggerQuestion.id" x-text="triggerQuestion.label"></option>
+                                        </template>
+                                    </select>
+                                    @error('depends_on_question_id')
+                                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+
+                                <div>
+                                    <label for="depends_on_option_id" class="block text-sm font-medium text-neutral-700 mb-2">
+                                        Existing Question Option
+                                    </label>
+                                    <select name="depends_on_option_id"
+                                            id="depends_on_option_id"
+                                            x-model="triggerOptionId"
+                                            :disabled="!triggerQuestionId"
+                                            class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-neutral-100 disabled:cursor-not-allowed @error('depends_on_option_id') border-red-500 @enderror">
+                                        <option value="">Select option</option>
+                                        <template x-for="triggerOption in availableTriggerOptions" :key="triggerOption.id">
+                                            <option :value="triggerOption.id" x-text="triggerOption.option_text"></option>
+                                        </template>
+                                    </select>
+                                    @error('depends_on_option_id')
+                                        <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            </div>
+
+                            <p class="mt-3 text-xs text-neutral-500" x-show="selectedSubsectionId && filteredTriggerQuestions.length === 0">
+                                No eligible MCQ/Multiple Select question exists for the selected subsection yet.
+                            </p>
+                        </div>
+
+                        <!-- Main Question Marker -->
                         <div>
+                            <label class="flex items-center">
+                                <input type="checkbox"
+                                       name="is_main_question"
+                                       value="1"
+                                       {{ old('is_main_question', false) ? 'checked' : '' }}
+                                       class="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500">
+                                <span class="ml-2 text-sm font-medium text-neutral-700">Use as main question for subsection numeric/comparison dashboards</span>
+                            </label>
+                        </div>
+
+                        <!-- Input Unit -->
+                        <div x-show="questionType != '4'">
                             <label for="input_unit" class="block text-sm font-medium text-neutral-700 mb-2">
                                 Input Unit <span class="text-neutral-500 text-xs">(Unit shown during data entry - e.g., MWh, %, kg)</span>
                             </label>
@@ -138,8 +282,134 @@
                             @enderror
                         </div>
 
+                        <!-- Multiple Numeric Child Questions -->
+                        <div x-show="questionType == '4'">
+                            <div class="border border-neutral-200 rounded-xl p-4 bg-neutral-50">
+                                <div class="mb-4">
+                                    <h3 class="font-medium text-neutral-800">Child Questions (Numeric)</h3>
+                                </div>
+
+                                @error('child_questions')
+                                    <p class="mb-3 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+
+                                <div class="space-y-4">
+                                    <template x-for="(child, childIndex) in childQuestions" :key="childIndex">
+                                        <div class="border border-neutral-200 rounded-lg p-4 bg-white">
+                                            <div class="flex items-center justify-between mb-3">
+                                                <p class="text-sm font-semibold text-neutral-700" x-text="`Child Question ${childIndex + 1}`"></p>
+                                                <button type="button"
+                                                        @click="removeChildQuestion(childIndex)"
+                                                        class="text-xs px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 transition-colors"
+                                                        x-show="childQuestions.length > 1">
+                                                    Remove
+                                                </button>
+                                            </div>
+
+                                            <input type="hidden" :name="`child_questions[${childIndex}][id]`" x-model="child.id">
+
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                <div class="md:col-span-2">
+                                                    <label class="block text-sm font-medium text-neutral-700 mb-2">Child Question Text <span class="text-red-500">*</span></label>
+                                                    <input type="text"
+                                                           :name="`child_questions[${childIndex}][question_text]`"
+                                                           x-model="child.question_text"
+                                                           class="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                           placeholder="Enter child question text">
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-neutral-700 mb-2">Input Unit</label>
+                                                    <input type="text"
+                                                           :name="`child_questions[${childIndex}][input_unit]`"
+                                                           x-model="child.input_unit"
+                                                           class="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                           placeholder="e.g., kWh, kg, litres">
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-neutral-700 mb-2">Equation Name</label>
+                                                    <input type="text"
+                                                           :name="`child_questions[${childIndex}][equation_name]`"
+                                                           x-model="child.equation_name"
+                                                           class="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                           placeholder="Optional">
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label class="block text-sm font-medium text-neutral-700 mb-2">Factors</label>
+
+                                                <template x-for="(factor, factorIndex) in child.factors" :key="factorIndex">
+                                                    <div class="grid grid-cols-12 gap-3 mb-2 items-start">
+                                                        <div class="col-span-1">
+                                                            <input type="number"
+                                                                   :name="`child_questions[${childIndex}][factors][${factorIndex}][sn]`"
+                                                                   x-model="factor.sn"
+                                                                   readonly
+                                                                   class="w-full px-3 py-2 border border-neutral-300 rounded-lg bg-neutral-100">
+                                                        </div>
+                                                        <div class="col-span-2">
+                                                            <select :name="`child_questions[${childIndex}][factors][${factorIndex}][operation]`"
+                                                                    x-model="factor.operation"
+                                                                    class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                                                <option value="multiply">×</option>
+                                                                <option value="add">+</option>
+                                                                <option value="subtract">-</option>
+                                                                <option value="divide">÷</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-span-3">
+                                                            <input type="number"
+                                                                   step="any"
+                                                                   :name="`child_questions[${childIndex}][factors][${factorIndex}][factor_value]`"
+                                                                   x-model="factor.factor_value"
+                                                                   class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                                                   placeholder="Value">
+                                                        </div>
+                                                        <div class="col-span-5">
+                                                            <select :name="`child_questions[${childIndex}][factors][${factorIndex}][country_id]`"
+                                                                    x-model="factor.country_id"
+                                                                    class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                                                <option value="">Select Country (Optional)</option>
+                                                                @foreach($countries as $country)
+                                                                    <option value="{{ $country->id }}">{{ $country->name }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-span-1">
+                                                            <button type="button"
+                                                                    @click="removeChildFactor(childIndex, factorIndex)"
+                                                                    class="w-full px-2 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    title="Remove Factor">
+                                                                <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </template>
+
+                                                <button type="button"
+                                                        @click="addChildFactor(childIndex)"
+                                                        class="mt-2 px-3 py-1.5 text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors font-medium text-sm">
+                                                    + Add Factor
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+
+                                <div class="mt-4 flex justify-end">
+                                    <button type="button"
+                                            @click="addChildQuestion()"
+                                            class="px-3 py-1.5 text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors font-medium text-sm">
+                                        + Add Child Question
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Equation Section (for Numeric type) -->
-                        <div x-show="questionType == '1'"
+                        <div x-show="questionType == '1'">
                             <div class="border border-neutral-200 rounded-xl p-4 bg-neutral-50">
                                 <h3 class="font-medium text-neutral-800 mb-4">Equation & Factors</h3>
                                 
@@ -232,7 +502,7 @@
                         </div>
 
                         <!-- Options Section (for MCQ and Multiple Select types) -->
-                        <div x-show="questionType == '2' || questionType == '3'"
+                        <div x-show="questionType == '2' || questionType == '3'">
                             <div class="border border-neutral-200 rounded-xl p-4 bg-neutral-50">
                                 <h3 class="font-medium text-neutral-800 mb-4">
                                     <span x-text="questionType == '3' ? 'Multiple Select Options' : 'Multiple Choice Options'"></span>
@@ -297,7 +567,7 @@
                                 <input type="checkbox"
                                        name="is_required"
                                        value="1"
-                                       {{ old('is_required', true) ? 'checked' : '' }}
+                                       {{ old('is_required', false) ? 'checked' : '' }}
                                        class="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500">
                                 <span class="ml-2 text-sm font-medium text-neutral-700">Required</span>
                             </label>

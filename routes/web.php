@@ -6,7 +6,6 @@ use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\SectionController;
 use App\Http\Controllers\SubsectionController;
-use App\Http\Controllers\ItemController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\CountryController;
 use App\Http\Controllers\FactoryTypeController;
@@ -132,23 +131,6 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:delete subsections')->group(function () {
         Route::delete('/subsections/{subsection}', [SubsectionController::class, 'destroy'])->name('subsections.destroy');
         Route::delete('/subsections', [SubsectionController::class, 'bulkDelete'])->name('subsections.bulk-delete');
-    });
-
-    // ESG Structure - Item Management Routes
-    Route::middleware('permission:view items')->group(function () {
-        Route::get('/items', [ItemController::class, 'index'])->name('items.index');
-    });
-    Route::middleware('permission:create items')->group(function () {
-        Route::get('/items/create', [ItemController::class, 'create'])->name('items.create');
-        Route::post('/items', [ItemController::class, 'store'])->name('items.store');
-    });
-    Route::middleware('permission:edit items')->group(function () {
-        Route::get('/items/{item}/edit', [ItemController::class, 'edit'])->name('items.edit');
-        Route::put('/items/{item}', [ItemController::class, 'update'])->name('items.update');
-    });
-    Route::middleware('permission:delete items')->group(function () {
-        Route::delete('/items/{item}', [ItemController::class, 'destroy'])->name('items.destroy');
-        Route::delete('/items', [ItemController::class, 'bulkDelete'])->name('items.bulk-delete');
     });
 
     // ESG Structure - Question Management Routes
