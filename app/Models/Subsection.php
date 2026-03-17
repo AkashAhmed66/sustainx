@@ -40,11 +40,27 @@ class Subsection extends Model
     }
 
     /**
+     * Get questions that belong directly to this subsection.
+     */
+    public function questions()
+    {
+        return $this->hasMany(Question::class)->orderBy('id');
+    }
+
+    /**
      * Get the images for this subsection.
      */
     public function images()
     {
         return $this->hasMany(SubsectionImage::class)->orderBy('order_no');
+    }
+
+    /**
+     * Get supporting documents uploaded for this subsection.
+     */
+    public function supportingDocuments()
+    {
+        return $this->hasMany(SupportingDocument::class)->orderByDesc('created_at');
     }
 
     /**

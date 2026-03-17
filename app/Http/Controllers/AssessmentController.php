@@ -5,16 +5,15 @@ namespace App\Http\Controllers;
 use App\Models\Answer;
 use App\Models\Assessment;
 use App\Models\Factory;
-use App\Models\Item;
 use App\Models\Question;
 use App\Models\Section;
-use App\Models\SupportingDocument;
 use App\Models\User;
 use App\Notifications\AssessmentSubmittedNotification;
 use App\Notifications\AssessmentApprovedNotification;
 use App\Notifications\AssessmentRejectedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
@@ -109,41 +108,43 @@ class AssessmentController extends Controller
      */
     public function show(Assessment $assessment)
     {
-        // Load assessment with all necessary relationships
+        // Load assessment with all necessary relationships.
         $assessment->load([
             'factory.factoryType',
             'factory.country',
-            'answers.question.item.subsection.section',
+            'answers.question.subsection.section',
             'answers.question.questionType',
             'answers.option'
         ]);
 
-        // Get all sections with their hierarchy for this assessment
+        // Get all sections with subsection-level questions for this assessment.
         $sections = Section::with([
-            'subsections.items' => function ($query) use ($assessment) {
-                $query->with([
-                    'questions' => function ($questionQuery) {
-                        $questionQuery->where('is_active', true)
-                            ->whereNull('parent_question_id')
-                            ->with([
-                                'questionType',
-                                'options',
-                                'childQuestions' => function ($childQuery) {
-                                    $childQuery->where('is_active', true)
-                                        ->orderBy('child_order_no')
-                                        ->orderBy('id')
-                                        ->with(['questionType', 'equation.factors']);
-                                },
-                            ]);
-                    },
-                    'supportingDocuments' => function ($docQuery) use ($assessment) {
-                        $docQuery->where('assessment_id', $assessment->id);
-                    },
-                ]);
+            'subsections' => function ($subsectionQuery) {
+                $subsectionQuery->where('is_active', true)
+                    ->orderBy('order_no')
+                    ->with([
+                        'questions' => function ($questionQuery) {
+                            $questionQuery->where('is_active', true)
+                                ->whereNull('parent_question_id')
+                                ->orderBy('id')
+                                ->with([
+                                    'questionType',
+                                    'options',
+                                    'childQuestions' => function ($childQuery) {
+                                        $childQuery->where('is_active', true)
+                                            ->orderBy('child_order_no')
+                                            ->orderBy('id')
+                                            ->with(['questionType', 'equation.factors']);
+                                    },
+                                ]);
+                        },
+                    ]);
             },
-        ])->get();
+        ])->where('is_active', true)
+          ->orderBy('order_no')
+          ->get();
 
-        // Get existing answers for this assessment
+        // Get existing answers for this assessment.
         $existingAnswers = $assessment->answers->keyBy('question_id');
 
         return view('assessments.show', compact('assessment', 'sections', 'existingAnswers'));
@@ -215,45 +216,45 @@ class AssessmentController extends Controller
      */
     public function perform(Assessment $assessment)
     {
-        // Load assessment with necessary relationships
+        // Load assessment with necessary relationships.
         $assessment->load([
             'factory.country',
             'answers.question',
             'answers.option'
         ]);
 
-        // Get all sections with active questions
+        // Get all sections with active subsection-level questions.
         $sections = Section::with([
-            'subsections.items' => function ($query) use ($assessment) {
-                $query->with([
-                    'questions' => function ($questionQuery) {
-                        $questionQuery->where('is_active', true)
-                            ->whereNull('parent_question_id')
-                            ->with([
-                                'questionType',
-                                'options' => function($q) {
-                                    $q->orderBy('order_no');
-                                },
-                                'equation.factors' => function($q) {
-                                    $q->orderBy('sn');
-                                },
-                                'childQuestions' => function ($childQuery) {
-                                    $childQuery->where('is_active', true)
-                                        ->orderBy('child_order_no')
-                                        ->orderBy('id')
-                                        ->with([
-                                            'questionType',
-                                            'equation.factors' => function ($q) {
-                                                $q->orderBy('sn');
-                                            },
-                                        ]);
-                                },
-                            ]);
-                    },
-                    'supportingDocuments' => function ($docQuery) use ($assessment) {
-                        $docQuery->where('assessment_id', $assessment->id);
-                    },
-                ]);
+            'subsections' => function ($subsectionQuery) {
+                $subsectionQuery->where('is_active', true)
+                    ->orderBy('order_no')
+                    ->with([
+                        'questions' => function ($questionQuery) {
+                            $questionQuery->where('is_active', true)
+                                ->whereNull('parent_question_id')
+                                ->orderBy('id')
+                                ->with([
+                                    'questionType',
+                                    'options' => function ($q) {
+                                        $q->orderBy('order_no');
+                                    },
+                                    'equation.factors' => function ($q) {
+                                        $q->orderBy('sn');
+                                    },
+                                    'childQuestions' => function ($childQuery) {
+                                        $childQuery->where('is_active', true)
+                                            ->orderBy('child_order_no')
+                                            ->orderBy('id')
+                                            ->with([
+                                                'questionType',
+                                                'equation.factors' => function ($q) {
+                                                    $q->orderBy('sn');
+                                                },
+                                            ]);
+                                    },
+                                ]);
+                        },
+                    ]);
             },
         ])->where('is_active', true)
           ->orderBy('order_no')
@@ -267,35 +268,33 @@ class AssessmentController extends Controller
 
         foreach ($sections as $section) {
             foreach ($section->subsections as $subsection) {
-                foreach ($subsection->items as $item) {
-                    foreach ($item->questions as $question) {
-                        $questionDependencyMap[$question->id] = [
-                            'question_type_id' => (int) $question->question_type_id,
-                            'parent_question_id' => $question->parent_question_id ? (int) $question->parent_question_id : null,
-                            'depends_on_question_id' => $question->depends_on_question_id ? (int) $question->depends_on_question_id : null,
-                            'depends_on_option_id' => $question->depends_on_option_id ? (int) $question->depends_on_option_id : null,
+                foreach ($subsection->questions as $question) {
+                    $questionDependencyMap[$question->id] = [
+                        'question_type_id' => (int) $question->question_type_id,
+                        'parent_question_id' => $question->parent_question_id ? (int) $question->parent_question_id : null,
+                        'depends_on_question_id' => $question->depends_on_question_id ? (int) $question->depends_on_question_id : null,
+                        'depends_on_option_id' => $question->depends_on_option_id ? (int) $question->depends_on_option_id : null,
+                    ];
+
+                    $existingAnswer = $existingAnswers->get($question->id);
+                    $initialAnswerState[$question->id] = [
+                        'selectedOptionId' => $existingAnswer?->option_id ? (int) $existingAnswer->option_id : null,
+                        'selectedOptionIds' => array_map('intval', $existingAnswer?->selected_options ?? []),
+                    ];
+
+                    foreach ($question->childQuestions as $childQuestion) {
+                        $questionDependencyMap[$childQuestion->id] = [
+                            'question_type_id' => (int) $childQuestion->question_type_id,
+                            'parent_question_id' => $childQuestion->parent_question_id ? (int) $childQuestion->parent_question_id : null,
+                            'depends_on_question_id' => $childQuestion->depends_on_question_id ? (int) $childQuestion->depends_on_question_id : null,
+                            'depends_on_option_id' => $childQuestion->depends_on_option_id ? (int) $childQuestion->depends_on_option_id : null,
                         ];
 
-                        $existingAnswer = $existingAnswers->get($question->id);
-                        $initialAnswerState[$question->id] = [
-                            'selectedOptionId' => $existingAnswer?->option_id ? (int) $existingAnswer->option_id : null,
-                            'selectedOptionIds' => array_map('intval', $existingAnswer?->selected_options ?? []),
+                        $childExistingAnswer = $existingAnswers->get($childQuestion->id);
+                        $initialAnswerState[$childQuestion->id] = [
+                            'selectedOptionId' => $childExistingAnswer?->option_id ? (int) $childExistingAnswer->option_id : null,
+                            'selectedOptionIds' => array_map('intval', $childExistingAnswer?->selected_options ?? []),
                         ];
-
-                        foreach ($question->childQuestions as $childQuestion) {
-                            $questionDependencyMap[$childQuestion->id] = [
-                                'question_type_id' => (int) $childQuestion->question_type_id,
-                                'parent_question_id' => $childQuestion->parent_question_id ? (int) $childQuestion->parent_question_id : null,
-                                'depends_on_question_id' => $childQuestion->depends_on_question_id ? (int) $childQuestion->depends_on_question_id : null,
-                                'depends_on_option_id' => $childQuestion->depends_on_option_id ? (int) $childQuestion->depends_on_option_id : null,
-                            ];
-
-                            $childExistingAnswer = $existingAnswers->get($childQuestion->id);
-                            $initialAnswerState[$childQuestion->id] = [
-                                'selectedOptionId' => $childExistingAnswer?->option_id ? (int) $childExistingAnswer->option_id : null,
-                                'selectedOptionIds' => array_map('intval', $childExistingAnswer?->selected_options ?? []),
-                            ];
-                        }
                     }
                 }
             }
@@ -312,24 +311,21 @@ class AssessmentController extends Controller
         $validated = $request->validate([
             'answers' => 'required|array',
             'answers.*.question_id' => 'required|exists:questions,id',
-            'answers.*.item_id' => 'required|exists:items,id',
+            'answers.*.subsection_id' => 'required|exists:subsections,id',
             'answers.*.value' => 'nullable',
             'answers.*.option_id' => 'nullable|exists:options,id',
             'answers.*.option_ids' => 'nullable|array',
             'answers.*.option_ids.*' => 'exists:options,id',
-            'item_documents' => 'nullable|array',
-            'item_documents.*' => 'nullable|array',
-            'item_documents.*.*' => 'nullable|file|max:10240|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png', // 10MB max
             'submit_action' => 'nullable|in:save,submit',
-            'save_item_id' => 'nullable|integer|exists:items,id',
+            'save_subsection_id' => 'nullable|integer|exists:subsections,id',
         ]);
 
-        $saveItemId = isset($validated['save_item_id']) ? (int) $validated['save_item_id'] : null;
+        $saveSubsectionId = isset($validated['save_subsection_id']) ? (int) $validated['save_subsection_id'] : null;
 
         $answers = collect($validated['answers']);
-        if ($saveItemId) {
+        if ($saveSubsectionId) {
             $answers = $answers
-                ->filter(fn ($answer) => (int) ($answer['item_id'] ?? 0) === $saveItemId)
+                ->filter(fn ($answer) => (int) ($answer['subsection_id'] ?? 0) === $saveSubsectionId)
                 ->values();
         }
 
@@ -355,16 +351,16 @@ class AssessmentController extends Controller
         try {
             foreach ($answers as $answerData) {
                 $questionId = (int) $answerData['question_id'];
-                $itemId = (int) $answerData['item_id'];
+                $subsectionId = (int) $answerData['subsection_id'];
                 $question = $questions->get($questionId);
 
                 if (!$question) {
                     continue;
                 }
 
-                if ((int) $question->item_id !== $itemId) {
+                if ($question->subsection_id && (int) $question->subsection_id !== $subsectionId) {
                     throw ValidationException::withMessages([
-                        'answers' => 'Invalid question and item combination submitted.',
+                        'answers' => 'Invalid question and subsection combination submitted.',
                     ]);
                 }
 
@@ -385,7 +381,6 @@ class AssessmentController extends Controller
                 $dataToSave = [
                     'assessment_id' => $assessment->id,
                     'question_id' => $questionId,
-                    'item_id' => $itemId,
                 ];
 
                 // Handle based on question type
@@ -486,56 +481,6 @@ class AssessmentController extends Controller
                 );
             }
 
-            // Handle file uploads per item
-            foreach ($request->file('item_documents', []) as $itemId => $files) {
-                if (!is_numeric($itemId)) {
-                    continue;
-                }
-
-                $itemId = (int) $itemId;
-                if ($saveItemId && $itemId !== $saveItemId) {
-                    continue;
-                }
-
-                if (!Item::whereKey($itemId)->exists()) {
-                    continue;
-                }
-
-                $files = is_array($files) ? $files : [$files];
-                if (count($files) === 0) {
-                    continue;
-                }
-
-                // Replace existing item documents when new files are uploaded.
-                SupportingDocument::where('assessment_id', $assessment->id)
-                    ->where('item_id', $itemId)
-                    ->get()
-                    ->each
-                    ->delete();
-
-                foreach ($files as $file) {
-                    $originalName = $file->getClientOriginalName();
-                    $fileName = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-
-                    $filePath = $file->storeAs(
-                        "supporting_documents/{$assessment->id}/item_{$itemId}",
-                        $fileName,
-                        'public'
-                    );
-
-                    SupportingDocument::create([
-                        'assessment_id' => $assessment->id,
-                        'item_id' => $itemId,
-                        'file_name' => $fileName,
-                        'file_path' => $filePath,
-                        'original_name' => $originalName,
-                        'file_size' => $file->getSize(),
-                        'mime_type' => $file->getMimeType(),
-                        'uploaded_by' => auth()->id(),
-                    ]);
-                }
-            }
-
             // Check if submitting for review
             if ($request->submit_action === 'submit') {
                 $assessment->update([
@@ -545,7 +490,7 @@ class AssessmentController extends Controller
                 
                 // Notify all admins and managers about the submission
                 $adminsAndManagers = User::role(['admin', 'manager'])->get();
-                Notification::send($adminsAndManagers, new AssessmentSubmittedNotification($assessment, auth()->user()));
+                Notification::send($adminsAndManagers, new AssessmentSubmittedNotification($assessment, Auth::user()));
                 
                 DB::commit();
                 return redirect()->route('assessments.show', $assessment)

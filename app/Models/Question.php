@@ -11,10 +11,12 @@ class Question extends Model
 
     protected $fillable = [
         'item_id',
+        'subsection_id',
         'parent_question_id',
         'child_order_no',
         'question_text',
         'question_type_id',
+        'is_main_question',
         'depends_on_question_id',
         'depends_on_option_id',
         'input_unit',
@@ -25,6 +27,7 @@ class Question extends Model
 
     protected $casts = [
         'child_order_no' => 'integer',
+        'is_main_question' => 'boolean',
         'is_required' => 'boolean',
         'is_active' => 'boolean',
     ];
@@ -35,6 +38,14 @@ class Question extends Model
     public function item()
     {
         return $this->belongsTo(Item::class);
+    }
+
+    /**
+     * Get the subsection that owns the question.
+     */
+    public function subsection()
+    {
+        return $this->belongsTo(Subsection::class);
     }
 
     /**

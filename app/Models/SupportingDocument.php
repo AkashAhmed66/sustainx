@@ -13,6 +13,7 @@ class SupportingDocument extends Model
     protected $fillable = [
         'assessment_id',
         'item_id',
+        'subsection_id',
         'file_name',
         'file_path',
         'original_name',
@@ -35,6 +36,14 @@ class SupportingDocument extends Model
     public function item()
     {
         return $this->belongsTo(Item::class);
+    }
+
+    /**
+     * Get the subsection that owns the document.
+     */
+    public function subsection()
+    {
+        return $this->belongsTo(Subsection::class);
     }
 
     /**

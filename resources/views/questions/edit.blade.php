@@ -11,7 +11,7 @@
                 <form action="{{ route('questions.update', $question) }}" method="POST"
                       x-data="{
                           questionType: '{{ old('question_type_id', $question->question_type_id) }}',
-                          selectedItemId: '{{ old('item_id', $question->item_id) }}',
+                          selectedSubsectionId: '{{ old('subsection_id', $question->subsection_id) }}',
                           triggerQuestions: {{ $triggerQuestionsJson }},
                           triggerQuestionId: '{{ old('depends_on_question_id', $question->depends_on_question_id) }}',
                           triggerOptionId: '{{ old('depends_on_option_id', $question->depends_on_option_id) }}',
@@ -20,12 +20,12 @@
                           equationName: '{{ old('equation_name', $equationName) }}',
                           childQuestions: {{ old('child_questions') ? json_encode(array_values(old('child_questions'))) : $childQuestionsJson }},
                           get filteredTriggerQuestions() {
-                              if (!this.selectedItemId) {
+                              if (!this.selectedSubsectionId) {
                                   return [];
                               }
 
                               return this.triggerQuestions.filter((question) => {
-                                  return String(question.item_id) === String(this.selectedItemId)
+                                  return String(question.subsection_id) === String(this.selectedSubsectionId)
                                       || String(question.id) === String(this.triggerQuestionId);
                               });
                           },
@@ -118,24 +118,24 @@
                     @method('PUT')
 
                     <div class="grid grid-cols-1 gap-6 mb-6">
-                        <!-- Item -->
+                        <!-- Subsection -->
                         <div>
-                            <label for="item_id" class="block text-sm font-medium text-neutral-700 mb-2">
-                                Item <span class="text-red-500">*</span>
+                            <label for="subsection_id" class="block text-sm font-medium text-neutral-700 mb-2">
+                                Subsection <span class="text-red-500">*</span>
                             </label>
-                            <select name="item_id"
-                                    id="item_id"
-                                    x-model="selectedItemId"
+                            <select name="subsection_id"
+                                    id="subsection_id"
+                                    x-model="selectedSubsectionId"
                                     required
-                                    class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('item_id') border-red-500 @enderror">
-                                <option value="">Select Item</option>
-                                @foreach($items as $item)
-                                    <option value="{{ $item->id }}" {{ old('item_id', $question->item_id) == $item->id ? 'selected' : '' }}>
-                                        {{ $item->subsection->section->name }} → {{ $item->subsection->name }} → {{ $item->name }}
+                                    class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('subsection_id') border-red-500 @enderror">
+                                <option value="">Select Subsection</option>
+                                @foreach($subsections as $subsection)
+                                    <option value="{{ $subsection->id }}" {{ old('subsection_id', $question->subsection_id) == $subsection->id ? 'selected' : '' }}>
+                                        {{ $subsection->section->name }} → {{ $subsection->name }}
                                     </option>
                                 @endforeach
                             </select>
-                            @error('item_id')
+                            @error('subsection_id')
                                 <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
@@ -193,7 +193,7 @@
                             </div>
 
                             <p class="text-xs text-neutral-600 mb-4">
-                                Show this question only when a specific option is selected in an existing MCQ/Multiple Select question from the same item.
+                                Show this question only when a specific option is selected in an existing MCQ/Multiple Select question from the same subsection.
                             </p>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -239,9 +239,21 @@
                                 </div>
                             </div>
 
-                            <p class="mt-3 text-xs text-neutral-500" x-show="selectedItemId && filteredTriggerQuestions.length === 0">
-                                No eligible MCQ/Multiple Select question exists for the selected item yet.
+                            <p class="mt-3 text-xs text-neutral-500" x-show="selectedSubsectionId && filteredTriggerQuestions.length === 0">
+                                No eligible MCQ/Multiple Select question exists for the selected subsection yet.
                             </p>
+                        </div>
+
+                        <!-- Main Question Marker -->
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox"
+                                       name="is_main_question"
+                                       value="1"
+                                       {{ old('is_main_question', $question->is_main_question) ? 'checked' : '' }}
+                                       class="w-4 h-4 text-primary-600 border-neutral-300 rounded focus:ring-primary-500">
+                                <span class="ml-2 text-sm font-medium text-neutral-700">Use as main question for subsection numeric/comparison dashboards</span>
+                            </label>
                         </div>
 
                         <!-- Input Unit -->

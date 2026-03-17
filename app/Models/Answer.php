@@ -12,7 +12,6 @@ class Answer extends Model
     protected $fillable = [
         'assessment_id',
         'question_id',
-        'item_id',
         'numeric_value',
         'actual_answer',
         'text_value',

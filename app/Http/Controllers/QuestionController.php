@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Question;
-use App\Models\Item;
+use App\Models\Subsection;
 use App\Models\QuestionType;
 use App\Models\Equation;
 use App\Models\Factor;
@@ -27,7 +27,7 @@ class QuestionController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Question::with(['item.subsection.section', 'questionType', 'equation'])
+        $query = Question::with(['subsection.section', 'questionType', 'equation'])
             ->whereNull('parent_question_id');
 
         // Search
@@ -35,7 +35,10 @@ class QuestionController extends Controller
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('question_text', 'like', "%{$search}%")
-                  ->orWhereHas('item', function($q) use ($search) {
+                  ->orWhereHas('subsection', function($q) use ($search) {
+                      $q->where('name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('subsection.section', function($q) use ($search) {
                       $q->where('name', 'like', "%{$search}%");
                   })
                   ->orWhereHas('questionType', function($q) use ($search) {
@@ -55,8 +58,9 @@ class QuestionController extends Controller
 
         $columns = [
             'question_text' => 'Question',
-            'item' => 'Item',
+            'subsection' => 'Subsection',
             'question_type' => 'Type',
+            'main_question' => 'Main Question',
             'input_unit' => 'Input Unit',
             'output_unit' => 'Output Unit',
             'is_required' => 'Required',
@@ -86,17 +90,18 @@ class QuestionController extends Controller
      */
     public function create()
     {
-        $items = Item::with('subsection.section')
-            ->whereHas('subsection.section', function($q) {
+        $subsections = Subsection::with('section')
+            ->whereHas('section', function($q) {
                 $q->where('is_active', true);
             })
             ->where('is_active', true)
+            ->orderBy('section_id')
             ->orderBy('order_no')
             ->get();
         $questionTypes = QuestionType::all();
         $countries = Country::orderBy('name')->get();
         $triggerQuestions = Question::with([
-                'item.subsection.section',
+                'subsection.section',
                 'options' => function ($query) {
                     $query->orderBy('order_no');
                 },
@@ -123,7 +128,7 @@ class QuestionController extends Controller
         ]);
         $triggerQuestionsJson = $this->formatDependencyQuestionsForForm($triggerQuestions);
         
-        return view('questions.create', compact('items', 'questionTypes', 'countries', 'defaultOptions', 'defaultFactors', 'defaultChildQuestions', 'triggerQuestionsJson'));
+        return view('questions.create', compact('subsections', 'questionTypes', 'countries', 'defaultOptions', 'defaultFactors', 'defaultChildQuestions', 'triggerQuestionsJson'));
     }
 
     /**
@@ -132,13 +137,14 @@ class QuestionController extends Controller
     public function store(Request $request)
     {
         $rules = [
-            'item_id' => 'required|exists:items,id',
+            'subsection_id' => 'required|exists:subsections,id',
             'question_text' => 'required|string',
             'question_type_id' => 'required|exists:question_types,id',
             'depends_on_question_id' => 'nullable|exists:questions,id',
             'depends_on_option_id' => 'nullable|exists:options,id',
             'input_unit' => 'nullable|string|max:255',
             'output_unit' => 'nullable|string|max:255',
+            'is_main_question' => 'boolean',
             'is_required' => 'boolean',
             'is_active' => 'boolean',
         ];
@@ -171,9 +177,10 @@ class QuestionController extends Controller
 
         [$dependsOnQuestionId, $dependsOnOptionId] = $this->resolveDependencyForQuestion(
             $validated,
-            (int) $validated['item_id']
+            (int) $validated['subsection_id']
         );
 
+        $isMainQuestion = $request->has('is_main_question');
         $isRequired = $request->has('is_required');
         $isActive = $request->has('is_active');
         $questionTypeId = (int) $validated['question_type_id'];
@@ -181,11 +188,13 @@ class QuestionController extends Controller
         DB::beginTransaction();
         try {
             $question = Question::create([
-                'item_id' => (int) $validated['item_id'],
+                'item_id' => null,
+                'subsection_id' => (int) $validated['subsection_id'],
                 'parent_question_id' => null,
                 'child_order_no' => null,
                 'question_text' => $validated['question_text'],
                 'question_type_id' => $questionTypeId,
+                'is_main_question' => $isMainQuestion,
                 'depends_on_question_id' => $dependsOnQuestionId,
                 'depends_on_option_id' => $dependsOnOptionId,
                 'input_unit' => $questionTypeId === self::TYPE_MULTIPLE_NUMERIC ? null : ($validated['input_unit'] ?? null),
@@ -194,7 +203,7 @@ class QuestionController extends Controller
                 'is_active' => $isActive,
             ]);
 
-            $this->syncQuestionPayloadByType($question, $validated, $isRequired, $isActive);
+            $this->syncQuestionPayloadByType($question, $validated, $isMainQuestion, $isRequired, $isActive);
 
             DB::commit();
             return redirect()->route('questions.index')
@@ -217,17 +226,18 @@ class QuestionController extends Controller
                 ->with('error', 'Child questions can be edited from the mother question form.');
         }
 
-        $items = Item::with('subsection.section')
-            ->whereHas('subsection.section', function($q) {
+        $subsections = Subsection::with('section')
+            ->whereHas('section', function($q) {
                 $q->where('is_active', true);
             })
             ->where('is_active', true)
+            ->orderBy('section_id')
             ->orderBy('order_no')
             ->get();
         $questionTypes = QuestionType::all();
         $countries = Country::orderBy('name')->get();
         $triggerQuestions = Question::with([
-                'item.subsection.section',
+                'subsection.section',
                 'options' => function ($query) {
                     $query->orderBy('order_no');
                 },
@@ -308,7 +318,7 @@ class QuestionController extends Controller
         );
         $triggerQuestionsJson = $this->formatDependencyQuestionsForForm($triggerQuestions);
 
-        return view('questions.edit', compact('question', 'items', 'questionTypes', 'countries', 'optionsJson', 'factorsJson', 'equationName', 'childQuestionsJson', 'triggerQuestionsJson'));
+        return view('questions.edit', compact('question', 'subsections', 'questionTypes', 'countries', 'optionsJson', 'factorsJson', 'equationName', 'childQuestionsJson', 'triggerQuestionsJson'));
     }
 
     /**
@@ -322,13 +332,14 @@ class QuestionController extends Controller
         }
 
         $rules = [
-            'item_id' => 'required|exists:items,id',
+            'subsection_id' => 'required|exists:subsections,id',
             'question_text' => 'required|string',
             'question_type_id' => 'required|exists:question_types,id',
             'depends_on_question_id' => 'nullable|exists:questions,id',
             'depends_on_option_id' => 'nullable|exists:options,id',
             'input_unit' => 'nullable|string|max:255',
             'output_unit' => 'nullable|string|max:255',
+            'is_main_question' => 'boolean',
             'is_required' => 'boolean',
             'is_active' => 'boolean',
         ];
@@ -362,10 +373,11 @@ class QuestionController extends Controller
 
         [$dependsOnQuestionId, $dependsOnOptionId] = $this->resolveDependencyForQuestion(
             $validated,
-            (int) $validated['item_id'],
+            (int) $validated['subsection_id'],
             $question
         );
 
+        $isMainQuestion = $request->has('is_main_question');
         $isRequired = $request->has('is_required');
         $isActive = $request->has('is_active');
         $questionTypeId = (int) $validated['question_type_id'];
@@ -373,11 +385,13 @@ class QuestionController extends Controller
         DB::beginTransaction();
         try {
             $question->update([
-                'item_id' => (int) $validated['item_id'],
+                'item_id' => null,
+                'subsection_id' => (int) $validated['subsection_id'],
                 'parent_question_id' => null,
                 'child_order_no' => null,
                 'question_text' => $validated['question_text'],
                 'question_type_id' => $questionTypeId,
+                'is_main_question' => $isMainQuestion,
                 'depends_on_question_id' => $dependsOnQuestionId,
                 'depends_on_option_id' => $dependsOnOptionId,
                 'input_unit' => $questionTypeId === self::TYPE_MULTIPLE_NUMERIC ? null : ($validated['input_unit'] ?? null),
@@ -386,7 +400,7 @@ class QuestionController extends Controller
                 'is_active' => $isActive,
             ]);
 
-            $this->syncQuestionPayloadByType($question, $validated, $isRequired, $isActive);
+            $this->syncQuestionPayloadByType($question, $validated, $isMainQuestion, $isRequired, $isActive);
 
             DB::commit();
             return redirect()->route('questions.index')
@@ -431,7 +445,7 @@ class QuestionController extends Controller
     /**
      * Sync related payload (options/equation/children) based on question type.
      */
-    private function syncQuestionPayloadByType(Question $question, array $validated, bool $isRequired, bool $isActive): void
+    private function syncQuestionPayloadByType(Question $question, array $validated, bool $isMainQuestion, bool $isRequired, bool $isActive): void
     {
         $typeId = (int) $validated['question_type_id'];
 
@@ -462,6 +476,7 @@ class QuestionController extends Controller
                 $question,
                 $validated['child_questions'] ?? [],
                 $validated['output_unit'] ?? null,
+                $isMainQuestion,
                 $isRequired,
                 $isActive
             );
@@ -533,7 +548,7 @@ class QuestionController extends Controller
     /**
      * Upsert child numeric questions for a multiple_numeric mother question.
      */
-    private function syncChildQuestionsForMother(Question $motherQuestion, array $childRows, ?string $sharedOutputUnit, bool $isRequired, bool $isActive): void
+    private function syncChildQuestionsForMother(Question $motherQuestion, array $childRows, ?string $sharedOutputUnit, bool $isMainQuestion, bool $isRequired, bool $isActive): void
     {
         $existingChildren = $motherQuestion->childQuestions()->with('equation.factors')->get()->keyBy('id');
         $keptChildIds = [];
@@ -555,11 +570,13 @@ class QuestionController extends Controller
             if ($childId && $existingChildren->has($childId)) {
                 $child = $existingChildren->get($childId);
                 $child->update([
-                    'item_id' => $motherQuestion->item_id,
+                    'item_id' => null,
+                    'subsection_id' => $motherQuestion->subsection_id,
                     'parent_question_id' => $motherQuestion->id,
                     'child_order_no' => $index + 1,
                     'question_text' => $childText,
                     'question_type_id' => self::TYPE_NUMERIC,
+                    'is_main_question' => $isMainQuestion,
                     'depends_on_question_id' => null,
                     'depends_on_option_id' => null,
                     'input_unit' => $childData['input_unit'] ?? null,
@@ -569,11 +586,13 @@ class QuestionController extends Controller
                 ]);
             } else {
                 $child = Question::create([
-                    'item_id' => $motherQuestion->item_id,
+                    'item_id' => null,
+                    'subsection_id' => $motherQuestion->subsection_id,
                     'parent_question_id' => $motherQuestion->id,
                     'child_order_no' => $index + 1,
                     'question_text' => $childText,
                     'question_type_id' => self::TYPE_NUMERIC,
+                    'is_main_question' => $isMainQuestion,
                     'depends_on_question_id' => null,
                     'depends_on_option_id' => null,
                     'input_unit' => $childData['input_unit'] ?? null,
@@ -610,14 +629,13 @@ class QuestionController extends Controller
     private function formatDependencyQuestionsForForm(Collection $questions): string
     {
         return $questions->map(function (Question $question) {
-            $section = $question->item?->subsection?->section?->name;
-            $subsection = $question->item?->subsection?->name;
-            $item = $question->item?->name;
-            $prefix = collect([$section, $subsection, $item])->filter()->implode(' -> ');
+            $section = $question->subsection?->section?->name;
+            $subsection = $question->subsection?->name;
+            $prefix = collect([$section, $subsection])->filter()->implode(' -> ');
 
             return [
                 'id' => $question->id,
-                'item_id' => $question->item_id,
+                'subsection_id' => $question->subsection_id,
                 'label' => trim($prefix . ' | ' . Str::limit($question->question_text, 120), ' |'),
                 'options' => $question->options->map(function (Option $option) {
                     return [
@@ -632,7 +650,7 @@ class QuestionController extends Controller
     /**
      * Validate and normalize conditional dependency fields.
      */
-    private function resolveDependencyForQuestion(array $validated, int $itemId, ?Question $currentQuestion = null): array
+    private function resolveDependencyForQuestion(array $validated, int $subsectionId, ?Question $currentQuestion = null): array
     {
         $dependsOnQuestionId = $validated['depends_on_question_id'] ?? null;
         $dependsOnOptionId = $validated['depends_on_option_id'] ?? null;
@@ -652,7 +670,7 @@ class QuestionController extends Controller
         $dependsOnOptionId = (int) $dependsOnOptionId;
 
         $parentQuestion = Question::with('options:id,question_id')
-            ->select('id', 'item_id', 'question_type_id', 'depends_on_question_id')
+            ->select('id', 'subsection_id', 'question_type_id', 'depends_on_question_id')
             ->find($dependsOnQuestionId);
 
         if (!$parentQuestion) {
@@ -667,9 +685,9 @@ class QuestionController extends Controller
             ]);
         }
 
-        if ((int) $parentQuestion->item_id !== $itemId) {
+        if ((int) $parentQuestion->subsection_id !== $subsectionId) {
             throw ValidationException::withMessages([
-                'depends_on_question_id' => 'Conditional dependency must be linked to an existing question from the same item.',
+                'depends_on_question_id' => 'Conditional dependency must be linked to an existing question from the same subsection.',
             ]);
         }
 
