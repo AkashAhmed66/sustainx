@@ -142,6 +142,24 @@
 
                         <!-- Question Text -->
                         <div>
+                            <label for="sl_no" class="block text-sm font-medium text-neutral-700 mb-2">
+                                Sl No <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number"
+                                   name="sl_no"
+                                   id="sl_no"
+                                   value="{{ old('sl_no', $question->sl_no) }}"
+                                   required
+                                   min="1"
+                                   class="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent @error('sl_no') border-red-500 @enderror"
+                                   placeholder="Enter global serial number">
+                            @error('sl_no')
+                                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <!-- Question Text -->
+                        <div>
                             <label for="question_text" class="block text-sm font-medium text-neutral-700 mb-2">
                                 Question Text <span class="text-red-500">*</span>
                             </label>

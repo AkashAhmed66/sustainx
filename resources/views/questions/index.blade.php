@@ -27,7 +27,11 @@
                 </td>
                 @endif
                 @foreach($columns as $key => $label)
-                    @if($key === 'question_text')
+                    @if($key === 'sl_no')
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-neutral-900">
+                            {{ $item->sl_no ?? '-' }}
+                        </td>
+                    @elseif($key === 'question_text')
                         <td class="px-6 py-4">
                             <div class="text-sm font-semibold text-neutral-900">{{ Str::limit($item->question_text, 60) }}</div>
                         </td>

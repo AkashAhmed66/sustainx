@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class QuestionController extends Controller
@@ -34,7 +35,8 @@ class QuestionController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
-                $q->where('question_text', 'like', "%{$search}%")
+                                $q->where('question_text', 'like', "%{$search}%")
+                                    ->orWhere('sl_no', 'like', "%{$search}%")
                   ->orWhereHas('subsection', function($q) use ($search) {
                       $q->where('name', 'like', "%{$search}%");
                   })
@@ -48,8 +50,8 @@ class QuestionController extends Controller
         }
 
         // Sorting
-        $sortField = $request->get('sort', 'created_at');
-        $sortDirection = $request->get('direction', 'desc');
+        $sortField = $request->get('sort', 'sl_no');
+        $sortDirection = $request->get('direction', 'asc');
         $query->orderBy($sortField, $sortDirection);
 
         // Pagination
@@ -57,6 +59,7 @@ class QuestionController extends Controller
         $items = $query->paginate($perPage);
 
         $columns = [
+            'sl_no' => 'Sl No',
             'question_text' => 'Question',
             'subsection' => 'Subsection',
             'question_type' => 'Type',
@@ -137,6 +140,12 @@ class QuestionController extends Controller
     public function store(Request $request)
     {
         $rules = [
+            'sl_no' => [
+                'required',
+                'integer',
+                'min:1',
+                Rule::unique('questions', 'sl_no'),
+            ],
             'subsection_id' => 'required|exists:subsections,id',
             'question_text' => 'required|string',
             'question_type_id' => 'required|exists:question_types,id',
@@ -188,6 +197,7 @@ class QuestionController extends Controller
         DB::beginTransaction();
         try {
             $question = Question::create([
+                'sl_no' => (int) $validated['sl_no'],
                 'item_id' => null,
                 'subsection_id' => (int) $validated['subsection_id'],
                 'parent_question_id' => null,
@@ -332,6 +342,12 @@ class QuestionController extends Controller
         }
 
         $rules = [
+            'sl_no' => [
+                'required',
+                'integer',
+                'min:1',
+                Rule::unique('questions', 'sl_no')->ignore($question->id),
+            ],
             'subsection_id' => 'required|exists:subsections,id',
             'question_text' => 'required|string',
             'question_type_id' => 'required|exists:question_types,id',
@@ -385,6 +401,7 @@ class QuestionController extends Controller
         DB::beginTransaction();
         try {
             $question->update([
+                'sl_no' => (int) $validated['sl_no'],
                 'item_id' => null,
                 'subsection_id' => (int) $validated['subsection_id'],
                 'parent_question_id' => null,
@@ -570,6 +587,7 @@ class QuestionController extends Controller
             if ($childId && $existingChildren->has($childId)) {
                 $child = $existingChildren->get($childId);
                 $child->update([
+                    'sl_no' => null,
                     'item_id' => null,
                     'subsection_id' => $motherQuestion->subsection_id,
                     'parent_question_id' => $motherQuestion->id,
@@ -586,6 +604,7 @@ class QuestionController extends Controller
                 ]);
             } else {
                 $child = Question::create([
+                    'sl_no' => null,
                     'item_id' => null,
                     'subsection_id' => $motherQuestion->subsection_id,
                     'parent_question_id' => $motherQuestion->id,
