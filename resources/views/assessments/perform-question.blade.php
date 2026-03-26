@@ -25,7 +25,8 @@
 
 <div class="{{ $containerClasses }}"
      data-question-id="{{ $question->id }}"
-     x-data="{ hasAnswer: {{ $existingAnswer ? 'true' : 'false' }} }"
+    x-data="{ hasAnswer: {{ $existingAnswer ? 'true' : 'false' }}, attachmentCount: 0 }"
+    :class="hasAnswer ? 'bg-green-50/60 border-green-200' : 'bg-red-50/50 border-red-200'"
      x-show="isQuestionVisible('{{ $question->id }}')"
      x-transition
      @change="hasAnswer = true; updateProgress()"
@@ -167,60 +168,48 @@
     @endif
 
     @if(!$isRelated)
-        <div class="mt-4 rounded-xl border border-neutral-200 bg-white p-4">
-            <div class="flex items-center justify-between gap-3 mb-3">
-                <div>
-                    <h5 class="text-sm font-semibold text-neutral-800">Supporting Documents</h5>
-                    <p class="text-xs text-neutral-500 mt-1">Upload files for this question and its related questions.</p>
-                </div>
-                <span class="px-2.5 py-1 text-xs rounded-full bg-neutral-100 text-neutral-600 font-medium">
-                    {{ $entityDocuments->count() }} file{{ $entityDocuments->count() === 1 ? '' : 's' }}
-                </span>
-            </div>
-
-            @if($entityDocuments->isNotEmpty())
-                <div class="mb-4 space-y-2">
-                    @foreach($entityDocuments as $document)
-                        <a href="{{ $document->file_url }}"
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           class="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 px-3 py-2 hover:bg-neutral-50 transition-colors">
-                            <div class="min-w-0">
-                                <p class="text-sm font-medium text-neutral-800 truncate">{{ $document->original_name }}</p>
-                                <p class="text-xs text-neutral-500">{{ $document->formatted_size }} • {{ $document->uploader->name ?? 'Unknown user' }} • {{ $document->created_at->format('M d, Y H:i') }}</p>
-                            </div>
-                            <span class="text-xs font-medium text-primary-600 whitespace-nowrap">Open</span>
-                        </a>
-                    @endforeach
-                </div>
-            @endif
-
-            @if($documentErrors->isNotEmpty())
-                <div class="mb-3 space-y-1">
-                    @foreach($documentErrors as $documentError)
-                        <p class="text-sm text-red-600">{{ $documentError }}</p>
-                    @endforeach
-                </div>
-            @endif
-
-            <div>
+        @unless($assessment->status === 'approved' || $assessment->status === 'in_review')
+            <div class="mt-4">
                 <input type="file"
+                       x-ref="questionAttachments{{ $question->id }}"
                        name="documents[{{ $question->id }}][]"
                        multiple
                        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.jpeg,.png"
-                       class="block w-full text-sm text-neutral-700 file:mr-4 file:rounded-lg file:border-0 file:bg-primary-50 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100 {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'pointer-events-none opacity-60' : '' }}"
-                       {{ ($assessment->status === 'approved' || $assessment->status === 'in_review') ? 'disabled' : '' }}>
-                <p class="mt-2 text-xs text-neutral-500">Allowed: PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, JPEG, PNG. Max 10 MB each.</p>
-            </div>
-        </div>
+                       class="hidden"
+                       @change="attachmentCount = $event.target.files.length">
 
-        @unless($assessment->status === 'approved' || $assessment->status === 'in_review')
-            <div class="mt-4 flex justify-end">
-                <button type="submit"
-                        @click="submitAction = 'save'; saveQuestionId = '{{ $question->id }}'"
-                        class="px-4 py-2 text-sm bg-white text-primary-600 border border-primary-600 rounded-lg hover:bg-primary-50 transition-colors font-medium">
-                    Save This Question
-                </button>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button type="button"
+                            @click="$refs.questionAttachments{{ $question->id }}.click()"
+                            class="w-full inline-flex items-center justify-center px-4 py-2.5 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors font-medium">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+                        </svg>
+                        Attachments
+                    </button>
+
+                    <button type="submit"
+                            @click="submitAction = 'save'; saveQuestionId = '{{ $question->id }}'"
+                            class="w-full inline-flex items-center justify-center px-4 py-2.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Submit
+                    </button>
+                </div>
+
+                <div class="mt-2 flex items-center justify-between text-xs text-neutral-500">
+                    <span x-show="attachmentCount > 0" x-text="`${attachmentCount} attachment(s) selected`"></span>
+                    <span>{{ $entityDocuments->count() }} uploaded</span>
+                </div>
+
+                @if($documentErrors->isNotEmpty())
+                    <div class="mt-2 space-y-1">
+                        @foreach($documentErrors as $documentError)
+                            <p class="text-sm text-red-600">{{ $documentError }}</p>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         @endunless
     @endif
