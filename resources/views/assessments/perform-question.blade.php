@@ -3,10 +3,10 @@
     $fieldName = "answers[{$questionKey}]";
     $dependentQuestions = $questions
         ->where('depends_on_question_id', $question->id)
-        ->sortBy([
-            fn ($questionItem) => $questionItem->sl_no === null ? 1 : 0,
-            fn ($questionItem) => $questionItem->sl_no ?? PHP_INT_MAX,
-            fn ($questionItem) => $questionItem->id,
+        ->sortBy(fn ($questionItem) => [
+            $questionItem->sl_no === null ? 1 : 0,
+            $questionItem->sl_no ?? PHP_INT_MAX,
+            $questionItem->id,
         ])
         ->values();
     $entityDocuments = !$isRelated
@@ -35,7 +35,7 @@
     <div class="flex items-start justify-between mb-4">
         <div class="flex-1">
             <label class="text-sm text-neutral-900 font-semibold flex items-start">
-                <span class="{{ $badgeClasses }}">{{ $displayIndex }}</span>
+                <span class="{{ $badgeClasses }}">{{ $question->sl_no ?? $displayIndex }}</span>
                 <span class="flex-1">
                     {{ $question->question_text }}
                     @if($question->is_required)

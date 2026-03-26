@@ -164,7 +164,14 @@
 
                                 <div class="space-y-4">
                                     @php
-                                        $rootQuestions = $subsection->questions->whereNull('depends_on_question_id')->values();
+                                        $rootQuestions = $subsection->questions
+                                            ->whereNull('depends_on_question_id')
+                                            ->sortBy(fn ($questionItem) => [
+                                                $questionItem->sl_no === null ? 1 : 0,
+                                                $questionItem->sl_no ?? PHP_INT_MAX,
+                                                $questionItem->id,
+                                            ])
+                                            ->values();
                                     @endphp
                                     @forelse($rootQuestions as $questionIndex => $question)
                                         @include('assessments.show-question', [
