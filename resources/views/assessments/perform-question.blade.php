@@ -1,7 +1,14 @@
 @php
     $existingAnswer = $existingAnswers[$question->id] ?? null;
     $fieldName = "answers[{$questionKey}]";
-    $dependentQuestions = $questions->where('depends_on_question_id', $question->id)->values();
+    $dependentQuestions = $questions
+        ->where('depends_on_question_id', $question->id)
+        ->sortBy([
+            fn ($questionItem) => $questionItem->sl_no === null ? 1 : 0,
+            fn ($questionItem) => $questionItem->sl_no ?? PHP_INT_MAX,
+            fn ($questionItem) => $questionItem->id,
+        ])
+        ->values();
     $entityDocuments = !$isRelated
         ? ($supportingDocumentsByQuestion->get($question->id) ?? collect())
         : collect();
