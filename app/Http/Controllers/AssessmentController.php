@@ -128,6 +128,8 @@ class AssessmentController extends Controller
                         'questions' => function ($questionQuery) {
                             $questionQuery->where('is_active', true)
                                 ->whereNull('parent_question_id')
+                                ->orderByRaw('CASE WHEN sl_no IS NULL THEN 1 ELSE 0 END')
+                                ->orderBy('sl_no')
                                 ->orderBy('id')
                                 ->with([
                                     'questionType',
@@ -236,6 +238,8 @@ class AssessmentController extends Controller
                         'questions' => function ($questionQuery) {
                             $questionQuery->where('is_active', true)
                                 ->whereNull('parent_question_id')
+                                ->orderByRaw('CASE WHEN sl_no IS NULL THEN 1 ELSE 0 END')
+                                ->orderBy('sl_no')
                                 ->orderBy('id')
                                 ->with([
                                     'questionType',
