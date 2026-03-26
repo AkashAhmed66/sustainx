@@ -10,6 +10,7 @@ class Question extends Model
     use HasFactory;
 
     protected $fillable = [
+        'sl_no',
         'item_id',
         'subsection_id',
         'parent_question_id',
@@ -26,6 +27,7 @@ class Question extends Model
     ];
 
     protected $casts = [
+        'sl_no' => 'integer',
         'child_order_no' => 'integer',
         'is_main_question' => 'boolean',
         'is_required' => 'boolean',
