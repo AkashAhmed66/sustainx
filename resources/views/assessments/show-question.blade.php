@@ -2,10 +2,10 @@
     $answer = $existingAnswers[$question->id] ?? null;
     $dependentQuestions = $questions
         ->where('depends_on_question_id', $question->id)
-        ->sortBy([
-            fn ($questionItem) => $questionItem->sl_no === null ? 1 : 0,
-            fn ($questionItem) => $questionItem->sl_no ?? PHP_INT_MAX,
-            fn ($questionItem) => $questionItem->id,
+        ->sortBy(fn ($questionItem) => [
+            $questionItem->sl_no === null ? 1 : 0,
+            $questionItem->sl_no ?? PHP_INT_MAX,
+            $questionItem->id,
         ])
         ->values();
     $entityDocuments = !$isRelated
@@ -22,7 +22,7 @@
 <div class="{{ $containerClasses }}" @if($isRelated) style="margin-left: {{ $depth * 1.25 }}rem;" @endif>
     <div class="flex items-start gap-3">
         <div class="flex-shrink-0 {{ $badgeClasses }}">
-            <span class="{{ $isRelated ? 'text-amber-700' : 'text-white' }} font-bold text-sm">{{ $displayIndex }}</span>
+            <span class="{{ $isRelated ? 'text-amber-700' : 'text-white' }} font-bold text-sm">{{ $question->sl_no ?? $displayIndex }}</span>
         </div>
 
         <div class="flex-1 min-w-0">
