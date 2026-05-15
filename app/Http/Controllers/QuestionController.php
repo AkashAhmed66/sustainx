@@ -18,10 +18,10 @@ use Illuminate\Validation\ValidationException;
 
 class QuestionController extends Controller
 {
-    private const TYPE_NUMERIC = 1;
-    private const TYPE_MCQ = 2;
-    private const TYPE_MULTIPLE_SELECT = 3;
-    private const TYPE_MULTIPLE_NUMERIC = 4;
+    public const TYPE_NUMERIC = 1;
+    public const TYPE_MCQ = 2;
+    public const TYPE_MULTIPLE_SELECT = 3;
+    public const TYPE_MULTIPLE_NUMERIC = 4;
 
     /**
      * Display a listing of the resource.
@@ -170,6 +170,39 @@ class QuestionController extends Controller
             $rules['options.*.option_text'] = 'nullable|string|max:255';
             $rules['options.*.option_value'] = 'nullable|numeric';
             $rules['options.*.order_no'] = 'nullable|integer|min:1';
+            $rules['connection_questions'] = 'nullable|array';
+            $rules['connection_questions.*'] = 'nullable|array';
+            $rules['connection_questions.*.*.id'] = 'nullable|integer|exists:questions,id';
+            $rules['connection_questions.*.*.sl_no'] = 'required_with:connection_questions.*.*.question_text|integer|min:1';
+            $rules['connection_questions.*.*.question_text'] = 'required_with:connection_questions.*.*.sl_no|string|max:1000';
+            $rules['connection_questions.*.*.input_unit'] = 'nullable|string|max:255';
+            $rules['connection_questions.*.*.output_unit'] = 'nullable|string|max:255';
+            $rules['connection_questions.*.*.question_type_id'] = 'required|exists:question_types,id';
+            $rules['connection_questions.*.*.is_required'] = 'nullable|boolean';
+            $rules['connection_questions.*.*.is_active'] = 'nullable|boolean';
+            $rules['connection_questions.*.*.equation_name'] = 'nullable|string|max:255';
+            $rules['connection_questions.*.*.factors'] = 'nullable|array';
+            $rules['connection_questions.*.*.factors.*.sn'] = 'nullable|integer|min:1';
+            $rules['connection_questions.*.*.factors.*.operation'] = 'nullable|string|in:multiply,add,subtract,divide';
+            $rules['connection_questions.*.*.factors.*.factor_value'] = 'nullable|numeric';
+            $rules['connection_questions.*.*.factors.*.country_id'] = 'nullable|exists:countries,id';
+            // Options when the connected question is MCQ/Multiple Select
+            $rules['connection_questions.*.*.options'] = 'nullable|array';
+            $rules['connection_questions.*.*.options.*.id'] = 'nullable|integer|exists:options,id';
+            $rules['connection_questions.*.*.options.*.option_text'] = 'nullable|string|max:255';
+            $rules['connection_questions.*.*.options.*.option_value'] = 'nullable|numeric';
+            $rules['connection_questions.*.*.options.*.order_no'] = 'nullable|integer|min:1';
+            // Child questions when the connected question is Multiple Numeric
+            $rules['connection_questions.*.*.child_questions'] = 'nullable|array';
+            $rules['connection_questions.*.*.child_questions.*.id'] = 'nullable|integer|exists:questions,id';
+            $rules['connection_questions.*.*.child_questions.*.question_text'] = 'nullable|string|max:1000';
+            $rules['connection_questions.*.*.child_questions.*.input_unit'] = 'nullable|string|max:255';
+            $rules['connection_questions.*.*.child_questions.*.equation_name'] = 'nullable|string|max:255';
+            $rules['connection_questions.*.*.child_questions.*.factors'] = 'nullable|array';
+            $rules['connection_questions.*.*.child_questions.*.factors.*.sn'] = 'nullable|integer|min:1';
+            $rules['connection_questions.*.*.child_questions.*.factors.*.operation'] = 'nullable|string|in:multiply,add,subtract,divide';
+            $rules['connection_questions.*.*.child_questions.*.factors.*.factor_value'] = 'nullable|numeric';
+            $rules['connection_questions.*.*.child_questions.*.factors.*.country_id'] = 'nullable|exists:countries,id';
         } elseif ((int) $request->question_type_id === self::TYPE_MULTIPLE_NUMERIC) {
             $rules['child_questions'] = 'required|array|min:1';
             $rules['child_questions.*.question_text'] = 'required|string|max:1000';
@@ -214,6 +247,9 @@ class QuestionController extends Controller
             ]);
 
             $this->syncQuestionPayloadByType($question, $validated, $isMainQuestion, $isRequired, $isActive);
+            if ($request->has('connection_questions')) {
+                $this->syncConnectedQuestionsForQuestion($question, $validated['connection_questions'] ?? []);
+            }
 
             DB::commit();
             return redirect()->route('questions.index')
@@ -328,7 +364,69 @@ class QuestionController extends Controller
         );
         $triggerQuestionsJson = $this->formatDependencyQuestionsForForm($triggerQuestions);
 
-        return view('questions.edit', compact('question', 'subsections', 'questionTypes', 'countries', 'optionsJson', 'factorsJson', 'equationName', 'childQuestionsJson', 'triggerQuestionsJson'));
+        // Prepare existing connected questions grouped by option order for the edit form
+        $options = $question->options()->orderBy('order_no')->get()->values();
+        $connectionQuestionsByOption = [];
+        foreach ($options as $opt) {
+            $connections = $question->dependentQuestions()->where('depends_on_option_id', $opt->id)->get();
+            $connectionQuestionsByOption[] = $connections->map(function (Question $conn) {
+                return [
+                    'id' => $conn->id,
+                    'question_type_id' => $conn->question_type_id,
+                    'sl_no' => $conn->sl_no,
+                    'question_text' => $conn->question_text,
+                    'input_unit' => $conn->input_unit,
+                    'equation_name' => $conn->equation->name ?? '',
+                    'factors' => $conn->equation && $conn->equation->factors->count() > 0
+                        ? $conn->equation->factors->map(function (Factor $factor) {
+                            return [
+                                'sn' => $factor->sn,
+                                'operation' => $factor->operation,
+                                'factor_value' => $factor->factor_value,
+                                'country_id' => $factor->country_id,
+                            ];
+                        })->values()->all()
+                        : [
+                            ['sn' => 1, 'operation' => 'multiply', 'factor_value' => '', 'country_id' => ''],
+                        ],
+                    'options' => $conn->options->map(function (Option $opt) {
+                        return [
+                            'id' => $opt->id,
+                            'option_text' => $opt->option_text,
+                            'option_value' => $opt->option_value,
+                            'order_no' => $opt->order_no,
+                        ];
+                    })->values()->all(),
+                    'child_questions' => $conn->childQuestions->map(function (Question $child) {
+                        return [
+                            'id' => $child->id,
+                            'question_text' => $child->question_text,
+                            'input_unit' => $child->input_unit,
+                            'equation_name' => $child->equation->name ?? '',
+                            'factors' => $child->equation && $child->equation->factors->count() > 0
+                                ? $child->equation->factors->map(function (Factor $factor) {
+                                    return [
+                                        'sn' => $factor->sn,
+                                        'operation' => $factor->operation,
+                                        'factor_value' => $factor->factor_value,
+                                        'country_id' => $factor->country_id,
+                                    ];
+                                })->values()->all()
+                                : [
+                                    ['sn' => 1, 'operation' => 'multiply', 'factor_value' => '', 'country_id' => ''],
+                                ],
+                        ];
+                    })->values()->all(),
+                    'output_unit' => $conn->output_unit,
+                    'is_required' => (bool) $conn->is_required,
+                    'is_active' => (bool) $conn->is_active,
+                ];
+            })->values()->all();
+        }
+
+        $connectionQuestionsByOptionJson = json_encode($connectionQuestionsByOption);
+
+        return view('questions.edit', compact('question', 'subsections', 'questionTypes', 'countries', 'optionsJson', 'factorsJson', 'equationName', 'childQuestionsJson', 'triggerQuestionsJson', 'connectionQuestionsByOptionJson'));
     }
 
     /**
@@ -372,6 +470,37 @@ class QuestionController extends Controller
             $rules['options.*.option_text'] = 'nullable|string|max:255';
             $rules['options.*.option_value'] = 'nullable|numeric';
             $rules['options.*.order_no'] = 'nullable|integer|min:1';
+            $rules['connection_questions'] = 'nullable|array';
+            $rules['connection_questions.*'] = 'nullable|array';
+            $rules['connection_questions.*.*.id'] = 'nullable|integer|exists:questions,id';
+            $rules['connection_questions.*.*.sl_no'] = 'required_with:connection_questions.*.*.question_text|integer|min:1';
+            $rules['connection_questions.*.*.question_text'] = 'required_with:connection_questions.*.*.sl_no|string|max:1000';
+            $rules['connection_questions.*.*.input_unit'] = 'nullable|string|max:255';
+            $rules['connection_questions.*.*.output_unit'] = 'nullable|string|max:255';
+            $rules['connection_questions.*.*.question_type_id'] = 'required|exists:question_types,id';
+            $rules['connection_questions.*.*.is_required'] = 'nullable|boolean';
+            $rules['connection_questions.*.*.is_active'] = 'nullable|boolean';
+            $rules['connection_questions.*.*.equation_name'] = 'nullable|string|max:255';
+            $rules['connection_questions.*.*.factors'] = 'nullable|array';
+            $rules['connection_questions.*.*.factors.*.sn'] = 'nullable|integer|min:1';
+            $rules['connection_questions.*.*.factors.*.operation'] = 'nullable|string|in:multiply,add,subtract,divide';
+            $rules['connection_questions.*.*.factors.*.factor_value'] = 'nullable|numeric';
+            $rules['connection_questions.*.*.factors.*.country_id'] = 'nullable|exists:countries,id';
+            $rules['connection_questions.*.*.options'] = 'nullable|array';
+            $rules['connection_questions.*.*.options.*.id'] = 'nullable|integer|exists:options,id';
+            $rules['connection_questions.*.*.options.*.option_text'] = 'nullable|string|max:255';
+            $rules['connection_questions.*.*.options.*.option_value'] = 'nullable|numeric';
+            $rules['connection_questions.*.*.options.*.order_no'] = 'nullable|integer|min:1';
+            $rules['connection_questions.*.*.child_questions'] = 'nullable|array';
+            $rules['connection_questions.*.*.child_questions.*.id'] = 'nullable|integer|exists:questions,id';
+            $rules['connection_questions.*.*.child_questions.*.question_text'] = 'nullable|string|max:1000';
+            $rules['connection_questions.*.*.child_questions.*.input_unit'] = 'nullable|string|max:255';
+            $rules['connection_questions.*.*.child_questions.*.equation_name'] = 'nullable|string|max:255';
+            $rules['connection_questions.*.*.child_questions.*.factors'] = 'nullable|array';
+            $rules['connection_questions.*.*.child_questions.*.factors.*.sn'] = 'nullable|integer|min:1';
+            $rules['connection_questions.*.*.child_questions.*.factors.*.operation'] = 'nullable|string|in:multiply,add,subtract,divide';
+            $rules['connection_questions.*.*.child_questions.*.factors.*.factor_value'] = 'nullable|numeric';
+            $rules['connection_questions.*.*.child_questions.*.factors.*.country_id'] = 'nullable|exists:countries,id';
         } elseif ((int) $request->question_type_id === self::TYPE_MULTIPLE_NUMERIC) {
             $rules['child_questions'] = 'required|array|min:1';
             $rules['child_questions.*.id'] = 'nullable|integer|exists:questions,id';
@@ -418,6 +547,9 @@ class QuestionController extends Controller
             ]);
 
             $this->syncQuestionPayloadByType($question, $validated, $isMainQuestion, $isRequired, $isActive);
+            if ($request->has('connection_questions')) {
+                $this->syncConnectedQuestionsForQuestion($question, $validated['connection_questions'] ?? []);
+            }
 
             DB::commit();
             return redirect()->route('questions.index')
@@ -638,6 +770,123 @@ class QuestionController extends Controller
 
         $existingChildren
             ->filter(fn (Question $child) => !in_array((int) $child->id, $keptChildIds, true))
+            ->each
+            ->delete();
+    }
+
+    /**
+     * Upsert dependent numeric questions for each MCQ/multiple-select option.
+     */
+    private function syncConnectedQuestionsForQuestion(Question $question, array $connectionRowsByOption): void
+    {
+        if (!in_array((int) $question->question_type_id, [self::TYPE_MCQ, self::TYPE_MULTIPLE_SELECT], true)) {
+            return;
+        }
+
+        $options = $question->options()->orderBy('order_no')->get()->values();
+        $existingConnections = $question->dependentQuestions()->get()->keyBy('id');
+        $keptConnectionIds = [];
+
+        foreach (array_values($connectionRowsByOption) as $optionIndex => $connectionRows) {
+            $option = $options->get($optionIndex);
+            if (!$option) {
+                continue;
+            }
+
+            foreach (array_values($connectionRows ?? []) as $connectionData) {
+                $connectionText = trim((string) ($connectionData['question_text'] ?? ''));
+                if ($connectionText === '') {
+                    continue;
+                }
+
+                $connectionId = isset($connectionData['id']) && $connectionData['id'] !== '' ? (int) $connectionData['id'] : null;
+                if ($connectionId && !$existingConnections->has($connectionId)) {
+                    throw ValidationException::withMessages([
+                        'connection_questions' => 'Invalid connection question payload submitted.',
+                    ]);
+                }
+
+                $payload = [
+                    'sl_no' => isset($connectionData['sl_no']) ? (int) $connectionData['sl_no'] : null,
+                    'item_id' => null,
+                    'subsection_id' => $question->subsection_id,
+                    'parent_question_id' => null,
+                    'child_order_no' => null,
+                    'question_text' => $connectionText,
+                    'question_type_id' => isset($connectionData['question_type_id']) ? (int) $connectionData['question_type_id'] : self::TYPE_NUMERIC,
+                    'is_main_question' => false,
+                    'depends_on_question_id' => $question->id,
+                    'depends_on_option_id' => $option->id,
+                    'input_unit' => $connectionData['input_unit'] ?? null,
+                    'output_unit' => $connectionData['output_unit'] ?? null,
+                    'is_required' => !empty($connectionData['is_required']),
+                    'is_active' => array_key_exists('is_active', $connectionData)
+                        ? (bool) $connectionData['is_active']
+                        : true,
+                ];
+
+                if ($connectionId && $existingConnections->has($connectionId)) {
+                    $connection = $existingConnections->get($connectionId);
+                    $connection->update($payload);
+                } else {
+                    $connection = Question::create($payload);
+                }
+
+                $connType = (int) $connection->question_type_id;
+
+                // Clean up unrelated artifacts when type changes
+                if (!in_array($connType, [self::TYPE_MCQ, self::TYPE_MULTIPLE_SELECT], true)) {
+                    $connection->options()->delete();
+                }
+
+                if ($connType !== self::TYPE_MULTIPLE_NUMERIC) {
+                    $connection->childQuestions()->delete();
+                }
+
+                if ($connType !== self::TYPE_NUMERIC) {
+                    // remove any orphaned equation if switching away from numeric
+                    $this->syncEquationForQuestion($connection, null, []);
+                }
+
+                // Type-specific persistence
+                if (in_array($connType, [self::TYPE_MCQ, self::TYPE_MULTIPLE_SELECT], true)) {
+                    // sync options for the connected MCQ/Multiple Select question
+                    $connection->options()->delete();
+                    $opts = collect($connectionData['options'] ?? [])->filter(fn($o) => isset($o['option_text']) && $o['option_text'] !== '')->values();
+                    foreach ($opts as $idx => $opt) {
+                        Option::create([
+                            'question_id' => $connection->id,
+                            'option_text' => $opt['option_text'],
+                            'option_value' => $opt['option_value'] ?? null,
+                            'order_no' => isset($opt['order_no']) ? (int) $opt['order_no'] : ($idx + 1),
+                        ]);
+                    }
+                } elseif ($connType === self::TYPE_MULTIPLE_NUMERIC) {
+                    $this->syncChildQuestionsForMother(
+                        $connection,
+                        $connectionData['child_questions'] ?? [],
+                        $connectionData['output_unit'] ?? null,
+                        false,
+                        (bool) ($connectionData['is_required'] ?? false),
+                        (bool) ($connectionData['is_active'] ?? true)
+                    );
+                } else {
+                    // numeric or other simple types: sync equation/factors for numeric
+                    if ($connType === self::TYPE_NUMERIC) {
+                        $this->syncEquationForQuestion(
+                            $connection,
+                            $connectionData['equation_name'] ?? null,
+                            $connectionData['factors'] ?? []
+                        );
+                    }
+                }
+
+                $keptConnectionIds[] = (int) $connection->id;
+            }
+        }
+
+        $existingConnections
+            ->filter(fn (Question $connection) => !in_array((int) $connection->id, $keptConnectionIds, true))
             ->each
             ->delete();
     }
