@@ -94,7 +94,8 @@ class UserController extends Controller
         ]);
 
         if (isset($validated['roles'])) {
-            $user->syncRoles($validated['roles']);
+            $roleNames = Role::whereIn('id', $validated['roles'])->pluck('name')->toArray();
+            $user->syncRoles($roleNames);
         }
 
         return redirect()->route('users.index')
@@ -133,7 +134,9 @@ class UserController extends Controller
             $user->update(['password' => Hash::make($validated['password'])]);
         }
 
-        $user->syncRoles($request->roles ?? []);
+        $roleIds = $request->roles ?? [];
+        $roleNames = Role::whereIn('id', $roleIds)->pluck('name')->toArray();
+        $user->syncRoles($roleNames);
 
         return redirect()->route('users.index')
             ->with('success', 'User updated successfully.');
