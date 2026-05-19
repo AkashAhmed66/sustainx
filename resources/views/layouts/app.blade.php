@@ -47,12 +47,36 @@
 
                 <!-- Sidebar Navigation -->
                 <nav class="sidebar-nav overflow-y-auto scrollbar-thin" style="max-height: calc(100vh - 64px);">
-                    @foreach(config('navigation.sidebar') as $item)
+                    @php
+                        $sidebarItems = config('navigation.sidebar');
+                        
+                        // Helper function to check if a section has any visible items
+                        $hasVisibleItems = function($startIndex) use ($sidebarItems) {
+                            for ($i = $startIndex + 1; $i < count($sidebarItems); $i++) {
+                                $nextItem = $sidebarItems[$i];
+                                
+                                // Stop at next divider or heading
+                                if ($nextItem['type'] === 'divider' || $nextItem['type'] === 'heading') {
+                                    break;
+                                }
+                                
+                                // Check if item is visible (passes permission check)
+                                if (!isset($nextItem['permission']) || auth()->user()->can($nextItem['permission'])) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        };
+                    @endphp
+                    
+                    @foreach($sidebarItems as $index => $item)
                         @if($item['type'] === 'divider')
-                            <div class="my-4 border-t border-primary-700"></div>
+                            @if($hasVisibleItems($index))
+                                <div class="my-4 border-t border-primary-700"></div>
+                            @endif
 
                         @elseif($item['type'] === 'heading')
-                            @if(!isset($item['permission']) || auth()->user()->can($item['permission']))
+                            @if((!isset($item['permission']) || auth()->user()->can($item['permission'])) && $hasVisibleItems($index))
                                 <div x-show="!sidebarCollapsed" class="px-4 py-2">
                                     <span class="text-xs font-semibold text-primary-300 uppercase tracking-wider">{{ $item['name'] }}</span>
                                 </div>
