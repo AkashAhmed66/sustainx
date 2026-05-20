@@ -4,7 +4,7 @@
     </x-slot>
 
     <div class="p-4 sm:p-6">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
             <a href="{{ route('assessments.index') }}"
                class="inline-flex items-center justify-center px-4 py-2.5 h-[42px] text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors font-medium">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -12,6 +12,23 @@
                 </svg>
                 Back to List
             </a>
+
+            @can('preview assessments')
+                <form method="POST" action="{{ route('assessments.preview-first') }}" class="flex flex-col sm:flex-row gap-3">
+                    @csrf
+                    <div class="flex-1">
+                        <select id="assessment-year-switcher" name="year" class="w-full h-[42px] rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-800 focus:border-primary-500 focus:ring-primary-500">
+                            <option value="">Latest available</option>
+                            @foreach($assessmentYears as $year)
+                                <option value="{{ $year }}" @selected($assessment->year == $year)>{{ $year }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <button type="submit" class="inline-flex items-center justify-center px-4 py-2.5 h-[42px] text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors font-medium">
+                        Change Year
+                    </button>
+                </form>
+            @endcan
             @if($assessment->status !== 'approved' && $assessment->status !== 'in_review')
                 <a href="{{ route('assessments.perform', $assessment) }}"
                    class="btn-primary inline-flex items-center justify-center h-[42px]">

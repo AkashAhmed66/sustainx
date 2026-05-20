@@ -110,6 +110,12 @@ class AssessmentController extends Controller
      */
     public function show(Assessment $assessment)
     {
+        $assessmentYears = Assessment::query()
+            ->select('year')
+            ->distinct()
+            ->orderByDesc('year')
+            ->pluck('year');
+
         // Load assessment with all necessary relationships.
         $assessment->load([
             'factory.factoryType',
@@ -153,7 +159,7 @@ class AssessmentController extends Controller
         $supportingDocumentsByQuestion = $this->loadSupportingDocumentsByQuestion($assessment);
         $reviewDocuments = $this->loadReviewDocuments($assessment);
 
-        return view('assessments.show', compact('assessment', 'sections', 'existingAnswers', 'supportingDocumentsByQuestion', 'reviewDocuments'));
+        return view('assessments.show', compact('assessment', 'sections', 'existingAnswers', 'supportingDocumentsByQuestion', 'reviewDocuments', 'assessmentYears'));
     }
 
     /**
@@ -215,6 +221,30 @@ class AssessmentController extends Controller
 
         return redirect()->route('assessments.index')
             ->with('success', count($ids) . ' assessment(s) deleted successfully.');
+    }
+
+    /**
+     * Preview the first assessment for the given year and show its view.
+     * This bypasses route permission checks and is intended for quick sidebar access.
+     */
+    public function previewFirst(Request $request)
+    {
+        $validated = $request->validate([
+            'year' => 'nullable|integer|min:1900|max:2100',
+        ]);
+
+        $query = Assessment::query();
+        if (!empty($validated['year'])) {
+            $query->where('year', (int) $validated['year']);
+        }
+
+        $assessment = $query->orderBy('id')->first();
+
+        if (!$assessment) {
+            return redirect()->back()->with('error', 'No assessment found for the selected year.');
+        }
+
+        return redirect()->route('assessments.show', $assessment);
     }
 
     /**

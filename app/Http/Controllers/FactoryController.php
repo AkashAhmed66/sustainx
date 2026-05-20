@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Assessment;
 use App\Models\Factory;
 use App\Models\FactoryType;
 use App\Models\Country;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class FactoryController extends Controller
 {
@@ -93,12 +95,27 @@ class FactoryController extends Controller
             'user_ids.*' => 'exists:users,id',
         ]);
 
-        $factory = Factory::create($validated);
+        DB::transaction(function () use ($validated, $request, &$factory) {
+            $factory = Factory::create($validated);
 
-        // Sync users if provided
-        if ($request->has('user_ids')) {
-            $factory->users()->sync($request->user_ids);
-        }
+            // Sync users if provided
+            if ($request->has('user_ids')) {
+                $factory->users()->sync($request->user_ids);
+            }
+
+            for ($year = 2023; $year <= now()->year; $year++) {
+                Assessment::firstOrCreate(
+                    [
+                        'factory_id' => $factory->id,
+                        'year' => $year,
+                        'period' => 'annual',
+                    ],
+                    [
+                        'status' => 'draft',
+                    ]
+                );
+            }
+        });
 
         return redirect()->route('factories.index')
             ->with('success', 'Factory created successfully.');

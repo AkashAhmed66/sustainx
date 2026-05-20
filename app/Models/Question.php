@@ -27,7 +27,7 @@ class Question extends Model
     ];
 
     protected $casts = [
-        'sl_no' => 'integer',
+        'sl_no' => 'string',
         'child_order_no' => 'integer',
         'is_main_question' => 'boolean',
         'is_required' => 'boolean',

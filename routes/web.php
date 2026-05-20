@@ -205,6 +205,10 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:view assessments')->group(function () {
         Route::get('/assessments', [AssessmentController::class, 'index'])->name('assessments.index');
     });
+    // Preview first assessment (sidebar quick access)
+    Route::middleware('permission:preview assessments')->group(function () {
+        Route::post('/assessments/preview-first', [AssessmentController::class, 'previewFirst'])->name('assessments.preview-first');
+    });
     Route::middleware('permission:create assessments')->group(function () {
         Route::get('/assessments/create', [AssessmentController::class, 'create'])->name('assessments.create');
         Route::post('/assessments', [AssessmentController::class, 'store'])->name('assessments.store');
