@@ -87,6 +87,7 @@ class RolePermissionSeeder extends Seeder
             'delete assessments',
             'approve assessments',
             'perform assessments',
+            'preview assessments',
 
             // Dashboard & Reports
             'view dashboard',

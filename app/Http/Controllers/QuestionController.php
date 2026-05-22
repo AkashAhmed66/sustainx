@@ -29,7 +29,8 @@ class QuestionController extends Controller
     public function index(Request $request)
     {
         $query = Question::with(['subsection.section', 'questionType', 'equation'])
-            ->whereNull('parent_question_id');
+            ->whereNull('parent_question_id')
+            ->whereNull('depends_on_question_id');
 
         // Search
         if ($request->filled('search')) {
@@ -110,6 +111,7 @@ class QuestionController extends Controller
                 },
             ])
             ->whereNull('parent_question_id')
+            ->whereNull('depends_on_question_id')
             ->where('is_active', true)
             ->whereIn('question_type_id', [self::TYPE_MCQ, self::TYPE_MULTIPLE_SELECT])
             ->orderBy('question_text')
@@ -142,8 +144,8 @@ class QuestionController extends Controller
         $rules = [
             'sl_no' => [
                 'required',
-                'integer',
-                'min:1',
+                'string',
+                'max:255',
                 Rule::unique('questions', 'sl_no'),
             ],
             'subsection_id' => 'required|exists:subsections,id',
@@ -173,7 +175,7 @@ class QuestionController extends Controller
             $rules['connection_questions'] = 'nullable|array';
             $rules['connection_questions.*'] = 'nullable|array';
             $rules['connection_questions.*.*.id'] = 'nullable|integer|exists:questions,id';
-            $rules['connection_questions.*.*.sl_no'] = 'required_with:connection_questions.*.*.question_text|integer|min:1';
+            $rules['connection_questions.*.*.sl_no'] = 'required_with:connection_questions.*.*.question_text|string|max:255';
             $rules['connection_questions.*.*.question_text'] = 'required_with:connection_questions.*.*.sl_no|string|max:1000';
             $rules['connection_questions.*.*.input_unit'] = 'nullable|string|max:255';
             $rules['connection_questions.*.*.output_unit'] = 'nullable|string|max:255';
@@ -230,7 +232,7 @@ class QuestionController extends Controller
         DB::beginTransaction();
         try {
             $question = Question::create([
-                'sl_no' => (int) $validated['sl_no'],
+                'sl_no' => $validated['sl_no'],
                 'item_id' => null,
                 'subsection_id' => (int) $validated['subsection_id'],
                 'parent_question_id' => null,
@@ -289,6 +291,7 @@ class QuestionController extends Controller
                 },
             ])
             ->whereNull('parent_question_id')
+            ->whereNull('depends_on_question_id')
             ->where('id', '!=', $question->id)
             ->where(function ($query) use ($question) {
                 $query->where(function ($eligible) {
@@ -442,8 +445,8 @@ class QuestionController extends Controller
         $rules = [
             'sl_no' => [
                 'required',
-                'integer',
-                'min:1',
+                'string',
+                'max:255',
                 Rule::unique('questions', 'sl_no')->ignore($question->id),
             ],
             'subsection_id' => 'required|exists:subsections,id',
@@ -530,7 +533,7 @@ class QuestionController extends Controller
         DB::beginTransaction();
         try {
             $question->update([
-                'sl_no' => (int) $validated['sl_no'],
+                'sl_no' => $validated['sl_no'],
                 'item_id' => null,
                 'subsection_id' => (int) $validated['subsection_id'],
                 'parent_question_id' => null,
@@ -807,7 +810,7 @@ class QuestionController extends Controller
                 }
 
                 $payload = [
-                    'sl_no' => isset($connectionData['sl_no']) ? (int) $connectionData['sl_no'] : null,
+                    'sl_no' => isset($connectionData['sl_no']) ? trim((string) $connectionData['sl_no']) : null,
                     'item_id' => null,
                     'subsection_id' => $question->subsection_id,
                     'parent_question_id' => null,
