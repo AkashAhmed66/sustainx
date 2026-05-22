@@ -476,7 +476,7 @@ class QuestionController extends Controller
             $rules['connection_questions'] = 'nullable|array';
             $rules['connection_questions.*'] = 'nullable|array';
             $rules['connection_questions.*.*.id'] = 'nullable|integer|exists:questions,id';
-            $rules['connection_questions.*.*.sl_no'] = 'required_with:connection_questions.*.*.question_text|integer|min:1';
+            $rules['connection_questions.*.*.sl_no'] = 'required_with:connection_questions.*.*.question_text|string|max:255';
             $rules['connection_questions.*.*.question_text'] = 'required_with:connection_questions.*.*.sl_no|string|max:1000';
             $rules['connection_questions.*.*.input_unit'] = 'nullable|string|max:255';
             $rules['connection_questions.*.*.output_unit'] = 'nullable|string|max:255';
